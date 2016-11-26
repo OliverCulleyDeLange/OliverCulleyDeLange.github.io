@@ -4,7 +4,7 @@
   {% capture img_path %}{{ page.header.image | absolute_url }}{% endcapture %}
 {% endif %}
 
-{% if page.header.cta_url contains "://" %}
+{% if page.header.cta_url contains "://" or page.header.cta_url contains "javascript" %}
   {% capture cta_path %}{{ page.header.cta_url }}{% endcapture %}
 {% else %}
   {% capture cta_path %}{{ page.header.cta_url | absolute_url }}{% endcapture %}
