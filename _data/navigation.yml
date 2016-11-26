@@ -4,5 +4,5 @@ main:
     url: https://oliverculleydelange.github.io/
   - title: "About"
     url: /about/
-#  - title: "CV"
-#    url: /cv/
+  - title: "CV"
+    url: /cv/

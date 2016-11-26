@@ -78,7 +78,7 @@ analytics:
 # Site Author
 author:
   name             : "Olly"
-  avatar           : "/assets/image/bio.jpg"
+  avatar           : "/assets/images/bio.jpg"
   bio              : "Ninja mountain goat"
   location         : "London, UK"
   email            :
