@@ -1,7 +1,7 @@
 # main links
 main:
-  - title: "Website"
-    url: https://oliverculleydelange.github.io/
+  - title: "Blog"
+    url: /
   - title: "About"
     url: /about/
   - title: "CV"
