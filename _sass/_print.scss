@@ -12,7 +12,13 @@
   .page__share,
   .page__related,
   .ads,
-  .page__footer {
+  .page__footer,
+  .noprint {
     display: none;
   }
+
+  .page-break {
+    page-break-after: always;
+  }
+
 }
