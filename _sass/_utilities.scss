@@ -156,6 +156,12 @@ body:hover .visually-hidden button {
   margin-right: auto;
 }
 
+/* image caption */
+img + em {
+    font-size: 0.6em;
+    display: block;
+}
+
 /* file page content container */
 
 .full {
