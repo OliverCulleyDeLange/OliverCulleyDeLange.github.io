@@ -77,7 +77,7 @@ This career break started with just under a month in Nepal. This is my account o
 
 10.30 - 11.10 (40 mins) - After a short water and photography break, walked from Australian Camp to Pothana (1890m), the next village along.
 
-11.10 - 11.30 (20 mins) - Got our Annapurna Conservation Area permits (ACAP) checked at the tourist checkpoint in Pothana. Took photos of the useful sign boards and information they had in the building. One of our group had yet to buy a TIMS card as the tourist office TIMS desk was shut when we went to get it. Luckily he managed to get the ACAP and was told at the tourist office he could get a TIMS card on route. At the checkpoint the man behind the counter only checked out ACAP and didn't want to see TIMS. When we asked about getting a TIMS card he said they couldnt do it there, and he didn't think you needed a TIMS for Mardi Himmal anyway. So we continued, slightly annoyed that we forked out $20 each for a TIMS we apparently didn't need. (TIMS cards were never checked throughout the whole treck)
+11.10 - 11.30 (20 mins) - Got our Annapurna Conservation Area permits (ACAP) checked at the tourist checkpoint in Pothana. Took photos of the useful sign boards and information they had in the building. One of our group had yet to buy a TIMS card as the tourist office TIMS desk was shut when we went to get it. Luckily he managed to get the ACAP and was told at the tourist office he could get a TIMS card on route. At the checkpoint the man behind the counter only checked out ACAP and didn't want to see TIMS. When we asked about getting a TIMS card he said they couldnt do it there, and he didn't think you needed a TIMS for Mardi Himmal anyway. So we continued, slightly annoyed that we forked out $20 each for a TIMS we apparently didn't need. (TIMS cards were never checked throughout the whole trek)
 
 ![Useful trek timing board]({{ site.url }}/assets/images/nepal/trek_times.jpg)
 *A useful board showing the expected trek times*
@@ -135,7 +135,7 @@ We explored High Camp where the view was an improvement on the already amazing v
 
 I awoke the next day unusually early at 5.15 and went out to the toilet. It was just getting light and the stars and the moon were on show. The sky looked beautiful so I grabbed my photographer roommate and we wandered around taking photos until breakfast time at 06:00.
 
-![Early morning stars]({{ site.url }}/assets/images/nepal/dan_stars.jpg)
+![Early morning stars]({{ site.url }}/assets/images/nepal/dan_stars.JPG)
 *Early morning stars, credit @mr_daniel_longley (instragram)*
 
 #### Day 3: 18 April
