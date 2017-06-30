@@ -1,5 +1,6 @@
 ---
 permalink: /about/
+title: "Who am I?"
 ---
 
 ### Code
