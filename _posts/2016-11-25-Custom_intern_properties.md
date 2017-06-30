@@ -1,6 +1,6 @@
 ---
 title:  "Custom intern properties"
-categories: testing
+categories: Code-testing
 tags: intern wiremock cors
 ---
 

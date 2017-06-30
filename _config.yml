@@ -7,10 +7,10 @@
 
 # Site Settings
 locale                   : "en"
-title                    : "Some Blog"
+title                    : "Campervans and code"
 title_separator          : "-"
 name                     : "Oliver Culley de Lange"
-description              : "Stuff I found hard to google."
+description              : "Campervans and code"
 url                      : "http://oliverdelange.co.uk" # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
 baseurl                  : "" # the subpath of your site, e.g. "/blog"
 repository               : # GitHub username/repo-name e.g. "mmistakes/minimal-mistakes"
@@ -79,8 +79,8 @@ analytics:
 author:
   name             : "Olly"
   avatar           : "/assets/images/bio.jpg"
-  bio              : "Ninja mountain goat"
-  location         : "London, UK"
+  bio              : "Campervans and code"
+  location         :
   email            :
   uri              : "http://oliverdelange.co.uk"
   bitbucket        :

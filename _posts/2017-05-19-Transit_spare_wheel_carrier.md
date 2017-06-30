@@ -1,7 +1,7 @@
 ---
 title:  "Transit campervan conversion - Spare wheel carrier"
-categories: Campervan
-tags: campervan transit tranny spare wheel carrier conversion self build
+categories: Campervans
+tags: campervans transit tranny spare wheel carrier conversion self build
 ---
 
 ### Ford Transit Mk7 Spare Wheel Carrier

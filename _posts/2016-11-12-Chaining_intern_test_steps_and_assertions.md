@@ -1,6 +1,6 @@
 ---
 title:  "Chaining intern test steps and assertions"
-categories: testing
+categories: Code-testing
 tags: intern
 ---
 

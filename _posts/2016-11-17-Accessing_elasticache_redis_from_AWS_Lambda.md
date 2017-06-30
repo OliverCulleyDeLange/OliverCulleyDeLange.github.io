@@ -1,6 +1,6 @@
 ---
 title:  "Accessing elasticache redis from AWS Java Lambda + Cloudformation"
-categories: aws
+categories: Code-cloud
 tags: aws elasticache lambda nat-gateway vpc cloudformation java
 ---
 

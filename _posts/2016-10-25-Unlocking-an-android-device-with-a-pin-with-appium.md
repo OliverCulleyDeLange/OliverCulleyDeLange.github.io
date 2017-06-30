@@ -1,6 +1,6 @@
 ---
 title:  "Unlocking an Android Emulator with a pin lock set - appium & mitmdump"
-categories: testing
+categories: Code-testing
 tags: android appium
 ---
 

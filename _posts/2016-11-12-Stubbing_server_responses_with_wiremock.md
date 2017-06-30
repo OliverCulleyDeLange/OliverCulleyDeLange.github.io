@@ -1,6 +1,6 @@
 ---
 title:  "Stubbing server responses with wiremock for functional testing a web app"
-categories: testing
+categories: Code-testing
 tags: intern wiremock
 ---
 
