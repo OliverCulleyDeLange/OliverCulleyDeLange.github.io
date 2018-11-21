@@ -11,7 +11,7 @@ title                    : "Campervans and code"
 title_separator          : "-"
 name                     : "Oliver Culley de Lange"
 description              : "Campervans and code"
-url                      : "http://oliverdelange.co.uk" # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
+url                      : "https://oliverdelange.co.uk" # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
 baseurl                  : "" # the subpath of your site, e.g. "/blog"
 repository               : # GitHub username/repo-name e.g. "mmistakes/minimal-mistakes"
 teaser                   : # path of fallback teaser image, e.g. "/assets/images/500x300.png"
@@ -82,7 +82,7 @@ author:
   bio              : "Campervans and code"
   location         :
   email            :
-  uri              : "http://oliverdelange.co.uk"
+  uri              : "https://oliverdelange.co.uk"
   bitbucket        :
   codepen          :
   dribbble         :
