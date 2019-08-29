@@ -1,8 +1,8 @@
 # main links
 main:
-  - title: "Blog"
-    url: /categories/
-  - title: "About"
-    url: /about/
-  - title: "CV"
-    url: /cv/
+  - title: "categories"
+    url: "/categories/"
+  - title: "cv"
+    url: /cv/ 
+  - title: "mvl"
+    url: /MvL/
