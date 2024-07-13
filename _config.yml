@@ -7,7 +7,7 @@ minimal_mistakes_skin    : "default" # "air", "aqua", "contrast", "dark", "dirt"
 locale                   : "en-GB"
 title                    : "oliverdelange"
 title_separator          : "|"
-description              : "A blog I probably won't keep up to date"
+description              : "A blog I probably won't keep up to date (yep, confirmed)"
 url                      : "https://oliverdelange.co.uk" # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
 
 permalink: /:categories/:title/

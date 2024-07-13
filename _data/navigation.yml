@@ -1,8 +1,4 @@
 # main links
 main:
-  - title: "categories"
-    url: "/categories/"
   - title: "cv"
     url: /cv/ 
-  - title: "mvl"
-    url: /MvL/
