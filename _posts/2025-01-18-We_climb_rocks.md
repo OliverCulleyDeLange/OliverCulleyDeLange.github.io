@@ -49,5 +49,5 @@ Ultimately though, it wasn't just the new job that made me mothball the project 
 
 # Demo Video
 <video muted autoplay controls width="320">
-    <source src="{{ site.url }}/assets/video/wct-kt-demo.webm" type="video/mp4">
+    <source src="{{ site.url }}/assets/video/wcr-kt-demo.webm" type="video/mp4">
 </video>
