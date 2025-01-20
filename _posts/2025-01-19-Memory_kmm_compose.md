@@ -41,6 +41,6 @@ Honestly, this project was the most straightforward i've ever undertaken. Yes, i
 One big downside is that the ios app looks _very_ Androidy. I don't care for this pet project, but i think i would if it was something i was planning to release. Obviously you can design your way out of this, but i couldn't be bothered for this project, and used stock colors and components - hence it looks pretty un-pretty. 
 
 # Demo Video
-<video muted autoplay controls>
+<video muted autoplay controls width="320">
     <source src="{{ site.url }}/assets/video/memory-kmm-compose-demo.mp4" type="video/mp4">
 </video>
