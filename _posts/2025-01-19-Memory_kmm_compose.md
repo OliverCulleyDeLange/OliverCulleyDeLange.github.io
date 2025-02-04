@@ -8,7 +8,7 @@ tags: android ios kotlin web kmm software game
 Spent a day building a simple memory game with KMM + Compose on all platforms. It was easy. 
 
 ## TSMD (Too short, more detail)
-During my 2024-2025 careers break (the 3rd one 😅), I found myself in the mountains in the USA with a bit of time on my hands. I'd been working on [Location Alarm](https://github.com/OliverCulleyDeLange/location-alarm) for a while, and felt like a change.
+During my 2024-2025 career break (the 3rd one 😅), I found myself in the mountains in the USA with a bit of time on my hands. I'd been working on [Location Alarm](https://github.com/OliverCulleyDeLange/location-alarm) for a while, and felt like a change.
 
 Having recently turned 30, I became somewhat paranoid about my lack of ability to remember anything over a 6 digit number. When a website sent me a OTP I'd often fail to enter it first time. I thought, maybe all the fancy tools in modern phone OS' which automatically enter OTPs from your messages have broken my memory. Or maybe i'm just getting old. Or both?
 
