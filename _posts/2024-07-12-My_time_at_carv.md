@@ -1,5 +1,5 @@
 ---
-title:  "My time at a skiing startup"
+title:  "My time at a skiing startup: Carv"
 categories: Work
 tags: work android software skiing startup carv
 ---
@@ -39,11 +39,8 @@ I started as you do any other job, setting up a laptop, meeting the team, joinin
 ## Testing the product
 I was sent a Carv unit - the hardware that sits in your ski boot. In an attempt to familiarize myself with the product and what it actually did, I tried to set it up. At the time I had a Moto G5s+, a low end Android device gifted to me by a friend. My first experiences with the Carv product were not good. When attempting to pair the sensors to my phone, I received an error. A simple phone restart resolved this error, but it was a bad UX from the get go, and i was worried what i had signed up for. After successfully pairing the sensors, i found a bunch of other bugs while browsing the app. More nerves. 
 
-## Windows and WSL
-I was using my laptop, a Lenovo C940 if my memory serves me right. A windows machine I bought mainly for the ability to turn into a tablet with integrated pen. Cool! The previous Android engineer was on mac, and compiling the rust codebase didn't seem to work on windows, so i tried it over WSL. Many hoops jumped through later, I had a working app that I could tweak and start fixing all those pesky bugs. 
-
 ## Customer Support
-One fantastic thing about Carv is that the engineers are on the front line of supporting customers. When I joined I was speaking to customers to diagnose their issues first hand. It was a stark change from my mega-corp job before, but it was somehow nice to hear the issues customers were having. It made me feel more responsible. However, it did add a new channel to the slowly building nervousness. 
+One fantastic thing about Carv is that the engineers are (or at least, were) on the front line of supporting customers. When I joined I was speaking to customers to diagnose their issues first hand. It was a stark change from my mega-corp job before, but it was somehow nice to hear the issues customers were having. It made me feel more responsible. However, it did add a new channel to the slowly building nervousness. 
 
 # April 2020: Things are improving
 It didn't take long to feel like things were going in the right direction. By my 8th working day, I did my first release. 1.3.16 contained my first small bug fix, a small but major milestone for me. 
@@ -56,7 +53,7 @@ Along side the large amount of bug fixing I was doing, we still had goals to rel
 I was falling into the mindset of 'everything is broken' again, and the nerves and stress were ramping up. 
 
 # December 2020 - Ski testing
-Later than ideal, I flew out to Zermatt, Switzerland.  I was performing some on mountain ski testing with a bunch of different devices we picked which were meant to cover a wide range of manufacturers, price points and OS versions. The trip should have been fun. I was being paid to go skiing for crying out loud. However, the trip was not fun. I was there for a total of 4 ski testing days. It was meant to be more, but I flew home early for reasons detailed below. 
+Later than ideal, I flew out to Zermatt, Switzerland.  I was performing some on mountain ski testing with a bunch of different devices we picked which were meant to cover a wide range of manufacturers, price points and OS versions. The trip should have been fun. I was being paid to go skiing! However, the trip was not fun. I was there for a total of 4 ski testing days. It was meant to be more, but I flew home early for reasons detailed below. 
 
 I was finding bugs. Lots of bugs. Bugs that weren't straightforward to fix. Bugs that were hard to reproduce or debug. 
 
@@ -82,7 +79,7 @@ To this day, there are 3 main issues that affect Carv on Android more so than Ca
 - The app would lose bluetooth connection to the sensors, and then the session timer would jump to a huge number
 - The app would just die, randomly
 
-My investigation, experimentation and analysis into these issues over the next 3 years turned into a [support page](https://getcarv.com/blog/phone-compatibility-with-carv) about Android device compatibility. Here you can read a customer friendly description about the issues and also a phone recommendation list born from analyzing over 175,000 skiing sessions. 
+My investigation, experimentation and analysis into these issues over the next 3 years turned into a [support page](https://getcarv.com/blog/phone-compatibility-with-carv) about Android device compatibility. Here you can read a customer friendly description about the issues and also a phone recommendation list born from me analyzing over 175,000 skiing sessions. 
 
 There are three separate and more in depth support pages for each issue:
 
@@ -290,6 +287,8 @@ I was pleased with the outcome and during my final month at Carv i was allowed t
 
 # Closing note
 This turned out to be a much longer blog than i was expecting. I guess i have a lot to write about due to the broad nature of the work i did at Carv. I really value that, it was a true 'in at the deep end' experience, but i learned a huge amount, not just through the work, but from the people around me to. 
+
+I'm proud to have had a positive impact on a sport that I love. Carv's motto is that 'skiing is more fun, the better at it you are' - and i fully agree. I went from SkiIQ 139 in the 2020/2021 season, all the way up to 166 in 2024/2025. Carv definitely contributed to this improvement, and there are thousands of others around the world feeling that same impact. Nice. 
 
 There aren't many pictures in this blog, but i'll end with one i'm proud of. 
 ![Map]({{ site.url }}/assets/images/carv/rating.png)
