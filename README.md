@@ -1,1 +1,5 @@
-bundle exec jekyll serve
+# Analytics 
+[ocd.goatcounter.com](https://ocd.goatcounter.com/)
+
+# Local
+`bundle exec jekyll serve`
