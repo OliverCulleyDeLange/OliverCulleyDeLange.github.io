@@ -18,6 +18,9 @@ comments:
 
 analytics:
 
+footer_scripts:
+  - goatcounter
+
 author:
   bio    : "A blog that I probably won't keep up to date (confirmed)"
   links:
@@ -96,6 +99,7 @@ defaults:
 category_archive:
   type: liquid
   path: /categories/
+
 tag_archive:
   type: liquid
   path: /tags/
