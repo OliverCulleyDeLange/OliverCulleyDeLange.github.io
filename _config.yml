@@ -33,6 +33,7 @@ author:
 
 include:
   - _pages
+  - _includes
 
 exclude:
   - "*.sublime-project"
