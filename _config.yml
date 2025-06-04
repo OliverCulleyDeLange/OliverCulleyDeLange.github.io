@@ -18,9 +18,6 @@ comments:
 
 analytics:
 
-footer_scripts:
-  - goatcounter
-
 author:
   bio    : "A blog that I probably won't keep up to date (confirmed)"
   links:
@@ -36,6 +33,7 @@ author:
 
 include:
   - _pages
+  - _includes
 
 exclude:
   - "*.sublime-project"
