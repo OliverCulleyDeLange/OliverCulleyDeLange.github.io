@@ -1,8 +1,7 @@
 ---
-layout: post
 title: "Schengen Days Calculator"
-date: 2025-10-19
 categories: projects
+tags: web software vibe coding travel schengen visa 
 ---
 
 ## Schengen Days Calculator - Free forever!
