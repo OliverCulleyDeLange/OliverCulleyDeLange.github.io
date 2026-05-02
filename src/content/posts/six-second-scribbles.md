@@ -1,13 +1,14 @@
 ---
+date: 2025-06-24
 title:  "Six Second Scribbles - Web Version"
 categories: projects
-tags: web software game vibe coding drawing
+tags: ["web", "software", "game", "vibe", "coding", "drawing"]
 ---
 
 # TLDR
 Reproduced a fun drawing game using AI in about 60 minutes: <a href="https://oliverdelange.co.uk/6ss/">6 Second Scribbles</a>
 
-![6 second scribbles]({{ site.url }}/assets/images/6ss/6ss.png)
+![6 second scribbles](/assets/images/6ss/6ss.png)
 
 
 # More plz

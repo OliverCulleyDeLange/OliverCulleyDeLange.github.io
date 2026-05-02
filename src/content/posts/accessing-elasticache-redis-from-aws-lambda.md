@@ -1,7 +1,8 @@
 ---
+date: 2016-11-17
 title:  "Accessing elasticache redis from AWS Java Lambda + Cloudformation"
 categories: Code-cloud
-tags: aws elasticache lambda nat-gateway vpc cloudformation java
+tags: ["aws", "elasticache", "lambda", "nat-gateway", "vpc", "cloudformation", "java"]
 ---
 
 I had real trouble trying to find tutorials, or even solid documentation on how to get this setup, and even more trouble getting the Cloudformation scripts to match what I hacked together through the AWS console.
@@ -65,7 +66,7 @@ I spent so long on this, that I actually [raised it on the AWS forums](https://f
 
 Its worth pointing out that my actual cloudformation stack json contains alot more than what is below - but these are the bits that are relevant to this post.
 
-{% highlight json %}
+```json
     "vpc": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
@@ -265,4 +266,4 @@ Its worth pointing out that my actual cloudformation stack json contains alot mo
         ]
       }
     },
-{% endhighlight%}
+```

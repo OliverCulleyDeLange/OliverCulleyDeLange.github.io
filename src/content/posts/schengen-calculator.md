@@ -1,14 +1,15 @@
 ---
+date: 2025-10-19
 title: "Schengen Days Calculator"
 categories: projects
-tags: web software vibe coding travel schengen visa 
+tags: ["web", "software", "vibe", "coding", "travel", "schengen", "visa"]
 ---
 
 ## Schengen Days Calculator - Free forever!
 
 [Schengen Calculator](https://oliverdelange.co.uk/schengen-calculator/) is my latest project designed to help travelers easily plan their trips within the Schengen Area. The tool makes it simple to track your days and ensure you stay within the 90/180 rule.
 
-![schengen calculator mvp]({{ site.url }}/assets/images/schengen/mvp.png)
+![schengen calculator mvp](/assets/images/schengen/mvp.png)
 
 ### Why I Built It
 As a frequent traveler to Europe, I need to keep track of my days.

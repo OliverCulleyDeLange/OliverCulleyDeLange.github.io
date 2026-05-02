@@ -1,13 +1,14 @@
 ---
+date: 2025-05-31
 title:  "GrvMkr: User Experience on Mobile and Shareability"
 categories: projects
-tags: web software percussion drumming samba ux user-experience
+tags: ["web", "software", "percussion", "drumming", "samba", "ux", "user-experience"]
 ---
 
 # TLDR
 Made <a href="https://oliverdelange.co.uk/grvmkr/">GrvMkr</a> into a mobile-friendly Progressive Web App (PWA) with a bunch of new features.
 
-![Theme toggle]({{ site.url }}/assets/images/grvmkr/4/theme.png)
+![Theme toggle](/assets/images/grvmkr/4/theme.png)
 
 
 # TSGM (Too Short, Gimme More)
@@ -37,17 +38,17 @@ This meant they should live in the grids, not in the instrument configuration se
 
 The rest, I wasn’t so sure about. In music production software (DAWs), M = Mute and S = Solo. I borrowed this convention — it’s not perfect for non-audio folks, but worst case, it's pretty clear what those buttons do, and they’re reversible, so I wasn’t too worried.
 
-![Initial mute and solo design]({{ site.url }}/assets/images/grvmkr/4/mute_solo.png)
+![Initial mute and solo design](/assets/images/grvmkr/4/mute_solo.png)
 
 For volume controls, I wanted to KISS (Keep It Simple, Stupid). I started with just a percentage, like `80%`, inside the first-row cell alongside the instrument name, mute, and solo buttons.
 
-![Initial volume control design - Too simple]({{ site.url }}/assets/images/grvmkr/4/volume_initial.png)
+![Initial volume control design - Too simple](/assets/images/grvmkr/4/volume_initial.png)
 
 You could drag that number left/down to decrease or right/up to increase. Technically it worked, but it wasn’t visually clear what `80%` meant.
 
 So I went with a simple triangle shape — an outline filled with green based on volume percentage.
 
-![Volume controls with filled triangle]({{ site.url }}/assets/images/grvmkr/4/volume_triangles.png)
+![Volume controls with filled triangle](/assets/images/grvmkr/4/volume_triangles.png)
 
 This, plus the number, is draggable to adjust volume. I had a mobile UX issue where the system scroll interfered — solved with a quick `event.preventDefault()` in `onpointerdown`.
 
@@ -92,7 +93,7 @@ On iOS, it's even more hidden. Only Safari can install PWAs — urgh.
 
 The only real benefit: easy home-screen access and no browser UI in your face.
 
-![PWA vs In Browser experience]({{ site.url }}/assets/images/grvmkr/4/pwa.png)
+![PWA vs In Browser experience](/assets/images/grvmkr/4/pwa.png)
 
 Interesting learning experience. Not worth the effort.
 
@@ -108,27 +109,27 @@ Hopefully users will see the “Save to file” button and use it before pressin
 
 Not perfect UX, but good enough for now.
 
-![My Grooves view]({{ site.url }}/assets/images/grvmkr/4/my_grooves.png)
+![My Grooves view](/assets/images/grvmkr/4/my_grooves.png)
 
 # Toggle Light and Dark Theme
 I added this mainly to test both themes without fiddling with macOS system settings.
 
 It also makes people aware of the theme toggle — some might prefer a different mode than their system default. Personally, I’m always in dark mode, and I much prefer GrvMkr that way.
 
-![Theme toggle]({{ site.url }}/assets/images/grvmkr/4/theme.png)
+![Theme toggle](/assets/images/grvmkr/4/theme.png)
 
 # Bundle Audio Files with Groove Files
 Previously, saving a groove created a big JSON file — grid structure, instruments, etc. But audio samples weren’t included, so importing required re-adding the audio files manually. Boo.
 
 Imagine a band leader sharing grooves with their group — they’d have to send a bunch of files separately. Ew.
 
-![Missing audio file error]({{ site.url }}/assets/images/grvmkr/4/missing_audio_file.png)
+![Missing audio file error](/assets/images/grvmkr/4/missing_audio_file.png)
 
 Bad experience — caused by MVP shortcuts. Time to fix it.
 
 Now, instead of saving just a JSON file, I wrap it in a ZIP with an `audio/` folder containing the samples. I rename the zip to `.grv` — just for fun.
 
-![.grv file structure]({{ site.url }}/assets/images/grvmkr/4/grv_zip_structure.png)
+![.grv file structure](/assets/images/grvmkr/4/grv_zip_structure.png)
 
 Now `.grv` files include everything — structure **and** audio. Import one and everything just works. Nice.
 

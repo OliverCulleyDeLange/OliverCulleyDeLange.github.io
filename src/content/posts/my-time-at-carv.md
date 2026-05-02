@@ -1,7 +1,8 @@
 ---
+date: 2024-07-12
 title:  "My time at a skiing startup: Carv"
 categories: Work
-tags: work android software skiing startup carv
+tags: ["work", "android", "software", "skiing", "startup", "carv"]
 ---
 
 I spent 4 years at Carv as an Android Engineer. I'm now funemployed for the 3rd time, and I want to write about my time there, because there were some interesting moments, but mainly so its easier to recall when i'm applying for jobs in the future. 
@@ -291,4 +292,4 @@ This turned out to be a much longer blog than i was expecting. I guess i have a 
 I'm proud to have had a positive impact on a sport that I love. Carv's motto is that 'skiing is more fun, the better at it you are' - and i fully agree. I went from SkiIQ 139 in the 2020/2021 season, all the way up to 166 in 2024/2025. Carv definitely contributed to this improvement, and there are thousands of others around the world feeling that same impact. Nice. 
 
 There aren't many pictures in this blog, but i'll end with one i'm proud of. 
-![Map]({{ site.url }}/assets/images/carv/rating.png)
+![Map](/assets/images/carv/rating.png)

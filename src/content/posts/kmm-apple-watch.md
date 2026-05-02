@@ -1,7 +1,8 @@
 ---
+date: 2025-02-24
 title:  "Kotlin Multiplatform on Apple Watch"
 categories: projects
-tags: ios kotlin multiplatform apple watch watchos
+tags: ["ios", "kotlin", "multiplatform", "apple", "watch", "watchos"]
 ---
 
 # TLDR

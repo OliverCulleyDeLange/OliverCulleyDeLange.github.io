@@ -1,7 +1,8 @@
 ---
+date: 2020-01-01
 title:  "We Climb Rocks"
 categories: projects
-tags: work android software climbing
+tags: ["work", "android", "software", "climbing"]
 ---
 
 # TLDR
@@ -23,7 +24,7 @@ The code is private on gitlab (back when they were the only ones offering free p
 
 The java only version was relatively feature complete though (albeit ugly), and there's a gif showing what it could do:
 
-![V1Demo]({{ site.url }}/assets/images/wcr/wcr-java.gif)
+![V1Demo](/assets/images/wcr/wcr-java.gif)
 
 # V2 - Kotlin
 The [Kotlin version](https://github.com/OliverCulleyDeLange/wcr-android-kt) added some boring but vital functionality such as:
@@ -49,5 +50,5 @@ Ultimately though, it wasn't just the new job that made me mothball the project 
 
 # Demo Video
 <video muted autoplay controls width="320">
-    <source src="{{ site.url }}/assets/video/wcr-kt-demo.webm" type="video/mp4">
+    <source src="/assets/video/wcr-kt-demo.webm" type="video/mp4">
 </video>
