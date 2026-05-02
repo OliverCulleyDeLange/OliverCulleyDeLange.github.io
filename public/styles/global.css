@@ -85,7 +85,7 @@ main {
 }
 
 /* ── Post list ── */
-.post-list h1 {
+.post-list .section-heading {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
 }
@@ -274,4 +274,196 @@ footer p {
 
 footer a {
   color: var(--muted);
+}
+
+/* ── Shared section heading ── */
+.section-heading {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  opacity: 0.85;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  padding: 0.3rem;
+  border-radius: 4px;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+
+.icon-link:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* ── Project cards (home page) ── */
+.projects-section {
+  margin-bottom: 3rem;
+}
+
+.project-cards {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.project-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.15s;
+}
+
+.project-card:hover {
+  border-color: var(--accent);
+}
+
+.project-card-body h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.project-card-body h3 a {
+  color: var(--text);
+}
+
+.project-card-body p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.project-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+/* ── Project page ── */
+.project-page .project-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-page .project-header h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin-bottom: 0.4rem;
+}
+
+.project-tagline {
+  font-size: 1.1rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.project-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.project-body {
+  line-height: 1.75;
+}
+
+.project-body p {
+  margin-bottom: 1.25rem;
+}
+
+.project-body strong {
+  font-weight: 600;
+}
+
+.related-posts {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.related-posts h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.related-posts ul {
+  list-style: none;
+}
+
+.related-posts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.related-posts li:last-child {
+  border-bottom: none;
+}
+
+.related-posts time {
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+/* ── Post list section heading ── */
+.post-list .section-heading {
+  margin-top: 0;
 }
