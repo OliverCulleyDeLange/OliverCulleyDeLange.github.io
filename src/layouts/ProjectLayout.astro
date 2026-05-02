@@ -12,7 +12,7 @@ const { name, tagline, appUrl, appLabel, githubUrl, relatedPosts } = project.dat
 
 // Load related blog posts
 const allPosts = await getCollection('posts');
-const linked = allPosts.filter(p => relatedPosts.includes(p.slug));
+const linked = allPosts.filter(p => relatedPosts.includes(p.id));
 linked.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 ---
 <BaseLayout title={name} description={tagline}>
@@ -45,7 +45,7 @@ linked.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
         <ul>
           {linked.map(post => (
             <li>
-              <a href={`/posts/${post.slug}/`}>{post.data.title}</a>
+              <a href={`/posts/${post.id}/`}>{post.data.title}</a>
               <time datetime={post.data.date.toISOString()}>
                 {post.data.date.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}
               </time>
