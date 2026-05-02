@@ -1,13 +1,14 @@
 ---
+date: 2025-02-12
 title:  "GrvMkr: Triplets"
 categories: projects
-tags: web software percussion drumming samba
+tags: ["web", "software", "percussion", "drumming", "samba"]
 ---
 
 # TLDR
 Added support for triplets and other non-standard beat divisions to [GrvMkr](https://oliverdelange.co.uk/grvmkr/). It was kinda painful. 
 
-![GrvMkr 9 days in]({{ site.url }}/assets/images/grvmkr/grvmkr_v3.png)
+![GrvMkr 9 days in](/assets/images/grvmkr/grvmkr_v3.png)
 
 # TSMD (Too Short, More Detail)
 Another three days have passed, and I'm about ready to put this project on pause. The past three days have been slightly painful, as I had to rework the domain layer of GrvMkr to make supporting triplets easier.
@@ -63,7 +64,7 @@ Earlier, I mentioned I couldn't be bothered to implement cell selection. Well, w
 
 There's probably a better way to allow users to input off-time hits, but I went with "show 'em all the options," as seen below.
 
-![GrvMkr Cell Tools]({{ site.url }}/assets/images/grvmkr/grvmkr_v3_cell_tools.png)
+![GrvMkr Cell Tools](/assets/images/grvmkr/grvmkr_v3_cell_tools.png)
 
 ## Samba Instruments
 I also spent some time finding some decent samba drum samples and made them available by default alongside the kick, snare, and hi-hat samples. This saves users from having to root around the internet for them, as they’re surprisingly hard to come by.

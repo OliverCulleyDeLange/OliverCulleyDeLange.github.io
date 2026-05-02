@@ -1,13 +1,14 @@
 ---
+date: 2025-02-03
 title:  "GrvMkr: An Online Grid Notation / Beat Making Tool"
 categories: projects
-tags: web software percussion drumming samba
+tags: ["web", "software", "percussion", "drumming", "samba"]
 ---
 
 # TLDR
 Spent 3 days building the MVP for a tool my mum wanted. [GrvMkr](https://oliverdelange.co.uk/grvmkr/) is a web based grid notation creation and playback tool. 
 
-![GrvMkr at MVP]({{ site.url }}/assets/images/grvmkr/grvmkr_v1.webp)
+![GrvMkr at MVP](/assets/images/grvmkr/grvmkr_v1.webp)
 
 ## TSMD (Too short, more detail)
 During my 2024-2025 career break (the 3rd one 😅), I found myself in the mountains in the USA with a bit of time on my hands. There was a huge storm, with gusts up to 70mph, so i didn't fancy going skiing. 

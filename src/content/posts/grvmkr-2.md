@@ -1,13 +1,14 @@
 ---
+date: 2025-02-06
 title:  "GrvMkr: Persistence"
 categories: projects
-tags: web software percussion drumming samba
+tags: ["web", "software", "percussion", "drumming", "samba"]
 ---
 
 # TLDR
 Spent another 3 days improving the [GrvMkr](https://oliverdelange.co.uk/grvmkr/) MVP. I gave it a memory amongst other things. Oh, also i like AI now - ChatGPT is my friend. 
 
-![GrvMkr 6 days in]({{ site.url }}/assets/images/grvmkr/grvmkr_v2.png)
+![GrvMkr 6 days in](/assets/images/grvmkr/grvmkr_v2.png)
 
 ## TSMD (Too short, more detail)
 I posted the MVP of GrvMkr on [reddit](https://www.reddit.com/r/drums/comments/1iha8mt/mangodrum_is_dead_long_live_grvmkr_a_simple_grid/) and got exactly one upvote (lol). 
@@ -16,7 +17,7 @@ I also searched the web to see if any one else apart from my mum was requesting 
 
 I showed them the MVP, and they came back with this:
 
-![GrvMkr needs persistence]({{ site.url }}/assets/images/grvmkr/reddit_comment.png)
+![GrvMkr needs persistence](/assets/images/grvmkr/reddit_comment.png)
 
 Obviously, i had more work to do. What use is a tool where you can't save your work?
 
@@ -79,7 +80,7 @@ Currently, if a phrase is over around 4 bars long, it becomes illegible and hard
 
 Here's a simple 4 bar phrase, in the print preview window. Any more bars than this and it would become useless. 
 
-![A 4 bar phrase]({{ site.url }}/assets/images/grvmkr/4barphrase.png)
+![A 4 bar phrase](/assets/images/grvmkr/4barphrase.png)
 
 I decided to split phrases into 2 bar chunks, and display them vertically. This number was picked from thin air, so i might tweak it in future based on feedback. 
 
@@ -87,7 +88,7 @@ After these changes, here's the print preview of a 3 bar phrase on page 1, and a
 
 I'm filling all available space with notation, so for odd number bar phrases, it looks kinda weird, but they're pretty uncommon and i think using all the available space is better than uniform layouts here. 
 
-![A 4 bar phrase]({{ site.url }}/assets/images/grvmkr/grvmkr_v1_print.png)
+![A 4 bar phrase](/assets/images/grvmkr/grvmkr_v1_print.png)
 
 While writing this article i've noticed that i should add some discrimination between the bars. Maybe a border around the bar, or an extra dark cell for the first beats of bars. 
 

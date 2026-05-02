@@ -1,7 +1,8 @@
 ---
+date: 2025-01-19
 title:  "A Cross Platform Memory Game"
 categories: projects
-tags: android ios kotlin web kmm software game
+tags: ["android", "ios", "kotlin", "web", "kmm", "software", "game"]
 ---
 
 # TLDR
@@ -42,5 +43,5 @@ One big downside is that the ios app looks _very_ Androidy. I don't care for thi
 
 # Demo Video
 <video muted autoplay controls width="320">
-    <source src="{{ site.url }}/assets/video/memory-kmm-compose-demo.mp4" type="video/mp4">
+    <source src="/assets/video/memory-kmm-compose-demo.mp4" type="video/mp4">
 </video>
