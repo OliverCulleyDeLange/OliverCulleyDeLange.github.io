@@ -5,6 +5,9 @@ on:
     branches:
       - master
   workflow_dispatch:
+  schedule:
+    # Monthly rebuild so the BoE mortgage rate baked into /mortgage-calculator/ stays current.
+    - cron: '0 8 1 * *'
 
 permissions:
   contents: read

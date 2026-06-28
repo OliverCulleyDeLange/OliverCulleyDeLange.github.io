@@ -1,0 +1,870 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const DEFAULT_RATE = 4.5;
+
+async function fetchBoERate(): Promise<{ rate: number; date: string | null }> {
+  try {
+    const today = new Date();
+    const dd = String(today.getUTCDate()).padStart(2, '0');
+    const mmm = today.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+    const yyyy = today.getUTCFullYear();
+    const params = new URLSearchParams({
+      'csv.x': 'yes',
+      Datefrom: '01/Jan/2024',
+      Dateto: `${dd}/${mmm}/${yyyy}`,
+      SeriesCodes: 'IUMBV37',
+      UsingCodes: 'Y',
+      CSVF: 'TT',
+      VPD: 'Y',
+      VFD: 'N',
+    });
+    const url = `https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?${params}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: { 'User-Agent': 'oliverdelange.co.uk static build' },
+    });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const text = await res.text();
+    const re = /"?(\d{1,2}\s+[A-Za-z]+\s+\d{4})"?\s*,\s*"?(\d+(?:\.\d+)?)"?/g;
+    let m: RegExpExecArray | null;
+    let latestDate: string | null = null;
+    let latestValue: number | null = null;
+    while ((m = re.exec(text)) !== null) {
+      latestDate = m[1];
+      latestValue = parseFloat(m[2]);
+    }
+    if (latestValue == null || latestDate == null) throw new Error('no data parsed');
+    return { rate: latestValue, date: latestDate };
+  } catch (err) {
+    console.warn('[mortgage-calculator] BoE rate fetch failed, using default:', err);
+    return { rate: DEFAULT_RATE, date: null };
+  }
+}
+
+const boeRate = import.meta.env.PROD
+  ? await fetchBoERate()
+  : { rate: DEFAULT_RATE, date: null };
+
+const defaultRate = boeRate.rate;
+const rateNote = boeRate.date
+  ? `3yr fix, 75% LTV — Bank of England, ${boeRate.date}`
+  : null;
+---
+<BaseLayout
+  title="UK Mortgage Calculator"
+  description="See how the monthly payment on a UK repayment mortgage changes with term length, for a given loan amount and interest rate."
+>
+  <article class="mortgage-calc">
+    <header class="mortgage-calc-header">
+      <h1>UK Mortgage Calculator</h1>
+      <p class="lede">
+        Enter a loan amount and interest rate. The chart shows how the monthly
+        payment and total interest change with the term length of a standard
+        UK repayment mortgage.
+      </p>
+    </header>
+
+    <details class="quick-estimate" open>
+      <summary>Quick estimate from salary &amp; deposit</summary>
+      <div class="quick-estimate-grid">
+        <label>
+          <span>Annual salary (£)</span>
+          <input type="number" id="salary" min="0" step="1000" placeholder="e.g. 50000" inputmode="numeric" />
+        </label>
+        <label>
+          <span>Deposit (£)</span>
+          <input type="number" id="deposit" min="0" step="1000" placeholder="e.g. 25000" inputmode="numeric" />
+        </label>
+      </div>
+      <p class="quick-estimate-note" id="quick-note" hidden></p>
+    </details>
+
+    <form class="mortgage-form" id="mortgage-form" autocomplete="off">
+      <label>
+        <span>Mortgage amount (£)</span>
+        <input type="number" id="amount" name="amount" min="1000" step="1000" value="250000" inputmode="numeric" />
+      </label>
+      <label>
+        <span>Interest rate (% / year)</span>
+        <input type="number" id="rate" name="rate" min="0" max="20" step="0.05" value={defaultRate} inputmode="decimal" />
+        {rateNote && <small class="rate-source">{rateNote}</small>}
+      </label>
+      <label>
+        <span>Monthly budget (£, optional)</span>
+        <input type="number" id="budget" name="budget" min="0" step="50" placeholder="e.g. 1500" inputmode="numeric" />
+      </label>
+      <label>
+        <span>Highlighted term (years)</span>
+        <input type="range" id="term" name="term" min="5" max="40" step="1" value="25" />
+        <output for="term" id="term-value">25 years</output>
+      </label>
+    </form>
+    <p class="budget-hint" id="budget-hint" hidden></p>
+
+    <section class="summary" aria-live="polite">
+      <div>
+        <span class="summary-label">Monthly payment</span>
+        <span class="summary-value" id="out-monthly">—</span>
+      </div>
+      <div>
+        <span class="summary-label">Total repaid</span>
+        <span class="summary-value" id="out-total">—</span>
+      </div>
+      <div>
+        <span class="summary-label">Total interest</span>
+        <span class="summary-value" id="out-interest">—</span>
+      </div>
+    </section>
+
+    <figure class="chart-wrap">
+      <div class="chart-canvas-wrap">
+        <canvas id="chart" aria-label="Monthly payment and total interest by mortgage term"></canvas>
+      </div>
+      <figcaption>
+        Monthly payment (left axis) and total interest over the lifetime of the
+        loan (right axis) vs mortgage term. Tap the chart to set the highlighted term.
+      </figcaption>
+    </figure>
+
+    <h2 class="chart-section-title">Payment breakdown over the selected term</h2>
+    <figure class="chart-wrap">
+      <div class="chart-canvas-wrap">
+        <canvas id="amort-chart" aria-label="Monthly payment split between interest and capital over the term"></canvas>
+      </div>
+      <figcaption>
+        How each monthly payment splits between interest (orange) and capital
+        (blue) for the highlighted term. Early payments are mostly interest;
+        as the balance shrinks the capital portion takes over.
+      </figcaption>
+    </figure>
+
+    <details class="how-it-works">
+      <summary>How the numbers are worked out</summary>
+      <p>
+        This uses the standard UK repayment-mortgage formula. For a principal
+        <code>P</code>, a monthly interest rate <code>r</code> (annual rate
+        divided by 12), and <code>n</code> monthly payments:
+      </p>
+      <pre><code>M = P · r · (1 + r)^n / ((1 + r)^n − 1)</code></pre>
+      <p>
+        It assumes a fixed rate for the whole term, which isn't how UK mortgages
+        actually work — most are fixed for 2–5 years and then revert to a
+        variable rate. Real lenders also add fees, stress-test affordability,
+        and round differently. Treat this as a rough planning tool, not advice.
+      </p>
+    </details>
+  </article>
+</BaseLayout>
+
+<style>
+  .mortgage-calc-header { margin-bottom: 1.5rem; }
+  .mortgage-calc-header h1 { font-size: 2rem; line-height: 1.2; margin-bottom: 0.5rem; }
+  .lede { color: var(--muted); margin-bottom: 0; }
+
+  .quick-estimate {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .quick-estimate summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .quick-estimate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+  }
+  .quick-estimate-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .quick-estimate-grid input {
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .quick-estimate-grid input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .quick-estimate-note {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .mortgage-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .mortgage-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .mortgage-form input[type="number"] {
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .mortgage-form input[type="number"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .mortgage-form input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .mortgage-form output { font-size: 0.85rem; color: var(--text); }
+  .rate-source { font-size: 0.7rem; color: var(--muted); margin-top: 0.1rem; }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+  }
+  .summary-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .summary-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .summary div:nth-child(1) .summary-value { color: var(--accent); }
+  .summary div:nth-child(3) .summary-value { color: var(--accent-warm); }
+
+  .budget-hint {
+    margin: -0.75rem 0 1.25rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent-warm) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-warm) 40%, transparent);
+    color: var(--text);
+    white-space: pre-line;
+  }
+
+  .chart-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+  }
+
+  .chart-wrap { margin: 0 0 2rem; }
+  .chart-canvas-wrap {
+    position: relative;
+    height: 360px;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .chart-wrap figcaption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+
+  .how-it-works {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+  }
+  .how-it-works summary { cursor: pointer; font-weight: 600; }
+  .how-it-works p { margin: 0.75rem 0; }
+  .how-it-works pre {
+    background: var(--border);
+    padding: 0.75rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+  }
+  .how-it-works code { font-family: var(--font-mono); }
+</style>
+
+<script>
+  import Chart from 'chart.js/auto';
+
+  const form = document.getElementById('mortgage-form') as HTMLFormElement;
+  const amountEl = document.getElementById('amount') as HTMLInputElement;
+  const rateEl = document.getElementById('rate') as HTMLInputElement;
+  const budgetEl = document.getElementById('budget') as HTMLInputElement;
+  const termEl = document.getElementById('term') as HTMLInputElement;
+  const termOut = document.getElementById('term-value') as HTMLOutputElement;
+  const monthlyOut = document.getElementById('out-monthly') as HTMLElement;
+  const totalOut = document.getElementById('out-total') as HTMLElement;
+  const interestOut = document.getElementById('out-interest') as HTMLElement;
+  const budgetHint = document.getElementById('budget-hint') as HTMLElement;
+  const salaryEl = document.getElementById('salary') as HTMLInputElement;
+  const depositEl = document.getElementById('deposit') as HTMLInputElement;
+  const quickNote = document.getElementById('quick-note') as HTMLElement;
+
+  const SALARY_MULTIPLE = 4.5;
+  const BUDGET_FRACTION = 0.35;
+  const canvas = document.getElementById('chart') as HTMLCanvasElement;
+  const amortCanvas = document.getElementById('amort-chart') as HTMLCanvasElement;
+
+  const MIN_TERM = 5;
+  const MAX_TERM = 40;
+  const years: number[] = [];
+  for (let y = MIN_TERM; y <= MAX_TERM; y++) years.push(y);
+
+  const fmtGBP0 = new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: 'GBP', maximumFractionDigits: 0,
+  });
+  const fmtGBP2 = new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: 'GBP', maximumFractionDigits: 2,
+  });
+
+  function monthlyPayment(principal: number, annualRatePct: number, yearsTerm: number) {
+    const n = yearsTerm * 12;
+    const r = annualRatePct / 100 / 12;
+    if (n <= 0) return 0;
+    if (r === 0) return principal / n;
+    const factor = Math.pow(1 + r, n);
+    return (principal * r * factor) / (factor - 1);
+  }
+
+  function readThemeColors() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+      text: s.getPropertyValue('--text').trim() || '#1a1a1a',
+      muted: s.getPropertyValue('--muted').trim() || '#666',
+      border: s.getPropertyValue('--border').trim() || '#e5e5e5',
+      accent: s.getPropertyValue('--accent').trim() || '#0070f3',
+      warm: s.getPropertyValue('--accent-warm').trim() || '#ea580c',
+      bg: s.getPropertyValue('--bg').trim() || '#fff',
+    };
+  }
+
+  const selectedTermPlugin = {
+    id: 'selectedTerm',
+    afterDatasetsDraw(chart: any, _args: any, opts: any) {
+      const term = opts.term;
+      if (term == null) return;
+      const x = chart.scales.x.getPixelForValue(term);
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.strokeStyle = opts.color || '#888';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+  Chart.register(selectedTermPlugin);
+
+  const budgetLinePlugin = {
+    id: 'budgetLine',
+    afterDatasetsDraw(chart: any, _args: any, opts: any) {
+      const value = opts.value;
+      if (!value || value <= 0) return;
+      const yScale = chart.scales.y;
+      const y = yScale.getPixelForValue(value);
+      const { ctx, chartArea } = chart;
+      if (y < chartArea.top - 4 || y > chartArea.bottom + 4) return;
+      ctx.save();
+      ctx.strokeStyle = opts.color || '#888';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = opts.color || '#888';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('Budget', chartArea.right - 6, y - 3);
+      ctx.restore();
+    },
+  };
+  Chart.register(budgetLinePlugin);
+
+  function computeAmortization(amount: number, annualRatePct: number, yearsTerm: number) {
+    const n = yearsTerm * 12;
+    const r = annualRatePct / 100 / 12;
+    const M = monthlyPayment(amount, annualRatePct, yearsTerm);
+    const capital: { x: number; y: number }[] = [];
+    const interestPaid: { x: number; y: number }[] = [];
+    let balance = amount;
+    for (let m = 1; m <= n; m++) {
+      const i = r === 0 ? 0 : balance * r;
+      const c = M - i;
+      balance = Math.max(0, balance - c);
+      capital.push({ x: m / 12, y: Math.max(0, c) });
+      interestPaid.push({ x: m / 12, y: Math.max(0, i) });
+    }
+    return { capital, interestPaid };
+  }
+
+  function computeSeries(amount: number, rate: number) {
+    const monthly = years.map(y => monthlyPayment(amount, rate, y));
+    const interest = years.map((y, i) => Math.max(0, monthly[i] * y * 12 - amount));
+    const monthlyPoints = years.map((y, i) => ({ x: y, y: monthly[i] }));
+    const interestPoints = years.map((y, i) => ({ x: y, y: interest[i] }));
+    // Per-month split (averaged over the lifetime). Sums to the monthly payment.
+    const avgMonthlyPrincipalPts = years.map(y => ({ x: y, y: y > 0 ? amount / (y * 12) : 0 }));
+    const avgMonthlyInterestPts = years.map((y, i) => ({ x: y, y: y > 0 ? interest[i] / (y * 12) : 0 }));
+    return { monthly, interest, monthlyPoints, interestPoints, avgMonthlyPrincipalPts, avgMonthlyInterestPts };
+  }
+
+  const colors = readThemeColors();
+
+  function alpha(hex: string, a: number) {
+    // Accept #rgb / #rrggbb. Returns rgba(...) string.
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  const initial = computeSeries(
+    Number(amountEl.value) || 0,
+    Number(rateEl.value) || 0,
+  );
+
+  const chart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          type: 'line',
+          label: 'Monthly payment',
+          data: initial.monthlyPoints,
+          yAxisID: 'y',
+          borderColor: colors.accent,
+          backgroundColor: alpha(colors.accent, 0.15),
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.2,
+          fill: false,
+          order: 0,
+        },
+        {
+          type: 'line',
+          label: 'Total interest over term',
+          data: initial.interestPoints,
+          yAxisID: 'y1',
+          borderColor: colors.warm,
+          backgroundColor: alpha(colors.warm, 0.15),
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.2,
+          fill: false,
+          order: 0,
+        },
+        {
+          type: 'bar',
+          label: 'Avg monthly principal',
+          data: initial.avgMonthlyPrincipalPts,
+          yAxisID: 'y',
+          backgroundColor: alpha(colors.accent, 0.22),
+          borderColor: 'transparent',
+          stack: 'monthly',
+          order: 2,
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
+        },
+        {
+          type: 'bar',
+          label: 'Avg monthly interest',
+          data: initial.avgMonthlyInterestPts,
+          yAxisID: 'y',
+          backgroundColor: alpha(colors.warm, 0.22),
+          borderColor: 'transparent',
+          stack: 'monthly',
+          order: 2,
+          barPercentage: 1.0,
+          categoryPercentage: 1.0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: colors.text, usePointStyle: true, boxWidth: 10 },
+        },
+        tooltip: {
+          backgroundColor: colors.bg,
+          titleColor: colors.text,
+          bodyColor: colors.text,
+          borderColor: colors.border,
+          borderWidth: 1,
+          callbacks: {
+            title: (items: any[]) => {
+              const y = items[0].parsed.x;
+              return `${y} year${y === 1 ? '' : 's'}`;
+            },
+            label: (item: any) => {
+              const v = item.parsed.y;
+              const isLifetime = item.dataset.yAxisID === 'y1';
+              const suffix = isLifetime ? ' total' : ' / month';
+              return `${item.dataset.label}: ${fmtGBP2.format(v)}${suffix}`;
+            },
+          },
+        },
+        // @ts-expect-error custom plugin opts
+        selectedTerm: { term: Number(termEl.value), color: colors.muted },
+        // @ts-expect-error custom plugin opts
+        budgetLine: { value: 0, color: colors.warm },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: MIN_TERM,
+          max: MAX_TERM,
+          title: { display: true, text: 'Mortgage term (years)', color: colors.muted },
+          ticks: {
+            color: colors.muted,
+            stepSize: 5,
+            callback: (v: any) => `${v}`,
+          },
+          grid: { color: alpha(colors.border, 0.6) },
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          stacked: true,
+          beginAtZero: true,
+          title: { display: true, text: 'Monthly payment', color: colors.accent },
+          ticks: {
+            color: colors.accent,
+            callback: (v: any) => fmtGBP0.format(v as number),
+          },
+          grid: { color: alpha(colors.border, 0.6) },
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          title: { display: true, text: 'Total interest', color: colors.warm },
+          ticks: {
+            color: colors.warm,
+            callback: (v: any) => fmtGBP0.format(v as number),
+          },
+          grid: { drawOnChartArea: false },
+        },
+      },
+      onClick(event, _elements, c) {
+        const xScale: any = c.scales.x;
+        const native: any = event.native;
+        if (!native) return;
+        const rect = (c.canvas as HTMLCanvasElement).getBoundingClientRect();
+        const px = native.clientX - rect.left;
+        const value = xScale.getValueForPixel(px);
+        const term = Math.min(MAX_TERM, Math.max(MIN_TERM, Math.round(value)));
+        if (String(term) !== termEl.value) {
+          termEl.value = String(term);
+          update();
+        }
+      },
+    },
+  });
+
+  const amortChart = new Chart(amortCanvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Capital',
+          data: [],
+          borderColor: colors.accent,
+          backgroundColor: alpha(colors.accent, 0.35),
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0,
+          fill: 'origin',
+        },
+        {
+          label: 'Interest',
+          data: [],
+          borderColor: colors.warm,
+          backgroundColor: alpha(colors.warm, 0.35),
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0,
+          fill: '-1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: colors.text, usePointStyle: true, boxWidth: 10 },
+        },
+        tooltip: {
+          backgroundColor: colors.bg,
+          titleColor: colors.text,
+          bodyColor: colors.text,
+          borderColor: colors.border,
+          borderWidth: 1,
+          callbacks: {
+            title: (items: any[]) => {
+              const month = Math.round(items[0].parsed.x * 12);
+              const years = Math.floor(month / 12);
+              const remMonths = month - years * 12;
+              return `Month ${month} (${years}y ${remMonths}m in)`;
+            },
+            label: (item: any) =>
+              `${item.dataset.label}: ${fmtGBP2.format(item.parsed.y)} / month`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          title: { display: true, text: 'Years into term', color: colors.muted },
+          ticks: { color: colors.muted },
+          grid: { color: alpha(colors.border, 0.6) },
+        },
+        y: {
+          type: 'linear',
+          stacked: true,
+          beginAtZero: true,
+          title: { display: true, text: 'Monthly payment split', color: colors.muted },
+          ticks: {
+            color: colors.muted,
+            callback: (v: any) => fmtGBP0.format(v as number),
+          },
+          grid: { color: alpha(colors.border, 0.6) },
+        },
+      },
+    },
+  });
+
+  function update(opts: { snap?: boolean } = {}) {
+    const amount = Math.max(0, Number(amountEl.value) || 0);
+    const rate = Math.max(0, Number(rateEl.value) || 0);
+    const budget = Math.max(0, Number(budgetEl.value) || 0);
+
+    const series = computeSeries(amount, rate);
+    const { monthly, interest } = series;
+    chart.data.datasets[0].data = series.monthlyPoints;
+    chart.data.datasets[1].data = series.interestPoints;
+    chart.data.datasets[2].data = series.avgMonthlyPrincipalPts;
+    chart.data.datasets[3].data = series.avgMonthlyInterestPts;
+
+    let snapped: number | null = null;
+    let unaffordable = false;
+    if (budget > 0 && opts.snap) {
+      for (let i = 0; i < monthly.length; i++) {
+        if (monthly[i] <= budget) { snapped = years[i]; break; }
+      }
+      if (snapped === null) {
+        snapped = MAX_TERM;
+        unaffordable = true;
+      }
+      termEl.value = String(snapped);
+    } else if (budget > 0) {
+      const cheapest = monthly[monthly.length - 1];
+      if (cheapest > budget) unaffordable = true;
+    }
+
+    const selectedTerm = Math.min(MAX_TERM, Math.max(MIN_TERM, Number(termEl.value) || 25));
+    termOut.textContent = selectedTerm + ' years';
+
+    (chart.options.plugins as any).selectedTerm.term = selectedTerm;
+    (chart.options.plugins as any).budgetLine.value = budget;
+
+    const idx = selectedTerm - MIN_TERM;
+    const mp = monthly[idx];
+    const totalPaid = mp * selectedTerm * 12;
+    const totalInterest = Math.max(0, totalPaid - amount);
+
+    monthlyOut.textContent = fmtGBP2.format(mp);
+    totalOut.textContent = fmtGBP0.format(totalPaid);
+    interestOut.textContent = fmtGBP0.format(totalInterest);
+
+    if (budget > 0) {
+      if (unaffordable) {
+        budgetHint.textContent =
+          `Even a ${MAX_TERM}-year term costs ${fmtGBP2.format(monthly[monthly.length - 1])}/mo, ` +
+          `above your ${fmtGBP0.format(budget)} budget.`;
+      } else {
+        const targetTerm = snapped ?? selectedTerm;
+        const targetIdx = targetTerm - MIN_TERM;
+        const marginalIdx = Math.min(monthly.length - 1, targetIdx + 1);
+        const marginalCost = interest[marginalIdx] - interest[targetIdx];
+        const monthlyRelief = monthly[targetIdx] - monthly[marginalIdx];
+
+        // Find a shorter term whose monthly payment is ~10% of budget more.
+        let shorterIdx = -1;
+        let bestDiff = Infinity;
+        const targetExtra = budget * 0.10;
+        const desiredMonthly = monthly[targetIdx] + targetExtra;
+        for (let i = 0; i < targetIdx; i++) {
+          const diff = Math.abs(monthly[i] - desiredMonthly);
+          if (diff < bestDiff) { bestDiff = diff; shorterIdx = i; }
+        }
+
+        const line1 =
+          `Shortest term within your ${fmtGBP0.format(budget)}/mo budget: ${targetTerm} years ` +
+          `at ${fmtGBP2.format(monthly[targetIdx])}/mo.`;
+        const line2 = targetTerm < MAX_TERM
+          ? `Stretching to ${targetTerm + 1} years would add ${fmtGBP0.format(marginalCost)} in interest ` +
+            `for only ${fmtGBP2.format(monthlyRelief)}/mo less.`
+          : '';
+        let line3 = '';
+        if (shorterIdx >= 0) {
+          const shorterTerm = years[shorterIdx];
+          const extraMonthly = monthly[shorterIdx] - monthly[targetIdx];
+          const interestSaving = interest[targetIdx] - interest[shorterIdx];
+          const pctOfBudget = Math.round((extraMonthly / budget) * 100);
+          line3 = `Shortening to ${shorterTerm} years would cost ${fmtGBP2.format(extraMonthly)}/mo more ` +
+            `(~${pctOfBudget}% of budget) and save ${fmtGBP0.format(interestSaving)} in interest.`;
+        }
+        budgetHint.textContent = [line1, line2, line3].filter(Boolean).join('\n');
+      }
+      budgetHint.hidden = false;
+    } else {
+      budgetHint.hidden = true;
+    }
+
+    chart.update();
+
+    const amort = computeAmortization(amount, rate, selectedTerm);
+    amortChart.data.datasets[0].data = amort.capital;
+    amortChart.data.datasets[1].data = amort.interestPaid;
+    (amortChart.options.scales as any).x.max = selectedTerm;
+    amortChart.update();
+  }
+
+  function applyTheme() {
+    const c = readThemeColors();
+    const ds0: any = chart.data.datasets[0];
+    const ds1: any = chart.data.datasets[1];
+    const ds2: any = chart.data.datasets[2];
+    const ds3: any = chart.data.datasets[3];
+    ds0.borderColor = c.accent;
+    ds0.backgroundColor = alpha(c.accent, 0.15);
+    ds1.borderColor = c.warm;
+    ds1.backgroundColor = alpha(c.warm, 0.15);
+    ds2.backgroundColor = alpha(c.accent, 0.22);
+    ds3.backgroundColor = alpha(c.warm, 0.22);
+
+    const opts: any = chart.options;
+    opts.plugins.legend.labels.color = c.text;
+    opts.plugins.tooltip.backgroundColor = c.bg;
+    opts.plugins.tooltip.titleColor = c.text;
+    opts.plugins.tooltip.bodyColor = c.text;
+    opts.plugins.tooltip.borderColor = c.border;
+    opts.plugins.selectedTerm.color = c.muted;
+    opts.plugins.budgetLine.color = c.warm;
+    opts.scales.x.title.color = c.muted;
+    opts.scales.x.ticks.color = c.muted;
+    opts.scales.x.grid.color = alpha(c.border, 0.6);
+    opts.scales.y.title.color = c.accent;
+    opts.scales.y.ticks.color = c.accent;
+    opts.scales.y.grid.color = alpha(c.border, 0.6);
+    opts.scales.y1.title.color = c.warm;
+    opts.scales.y1.ticks.color = c.warm;
+    chart.update();
+
+    const aDs0: any = amortChart.data.datasets[0];
+    const aDs1: any = amortChart.data.datasets[1];
+    aDs0.borderColor = c.accent;
+    aDs0.backgroundColor = alpha(c.accent, 0.35);
+    aDs1.borderColor = c.warm;
+    aDs1.backgroundColor = alpha(c.warm, 0.35);
+    const aOpts: any = amortChart.options;
+    aOpts.plugins.legend.labels.color = c.text;
+    aOpts.plugins.tooltip.backgroundColor = c.bg;
+    aOpts.plugins.tooltip.titleColor = c.text;
+    aOpts.plugins.tooltip.bodyColor = c.text;
+    aOpts.plugins.tooltip.borderColor = c.border;
+    aOpts.scales.x.title.color = c.muted;
+    aOpts.scales.x.ticks.color = c.muted;
+    aOpts.scales.x.grid.color = alpha(c.border, 0.6);
+    aOpts.scales.y.title.color = c.muted;
+    aOpts.scales.y.ticks.color = c.muted;
+    aOpts.scales.y.grid.color = alpha(c.border, 0.6);
+    amortChart.update();
+  }
+
+  function applyEstimate() {
+    const salary = Math.max(0, Number(salaryEl.value) || 0);
+    const deposit = Math.max(0, Number(depositEl.value) || 0);
+
+    if (salary > 0) {
+      const estLoan = Math.round(salary * SALARY_MULTIPLE);
+      const estBudget = Math.round((salary / 12) * BUDGET_FRACTION);
+      amountEl.value = String(estLoan);
+      budgetEl.value = String(estBudget);
+
+      const propertyPrice = estLoan + deposit;
+      const depositLine = deposit > 0
+        ? ` With your ${fmtGBP0.format(deposit)} deposit, that's a property up to ${fmtGBP0.format(propertyPrice)}.`
+        : '';
+      quickNote.textContent =
+        `Estimated mortgage: ${fmtGBP0.format(estLoan)} (${SALARY_MULTIPLE}× salary).${depositLine} ` +
+        `Suggested monthly budget: ${fmtGBP0.format(estBudget)} (${Math.round(BUDGET_FRACTION * 100)}% of gross monthly).`;
+      quickNote.hidden = false;
+    } else {
+      quickNote.hidden = true;
+    }
+  }
+
+  [salaryEl, depositEl].forEach(el => {
+    el.addEventListener('input', () => {
+      applyEstimate();
+      update({ snap: true });
+    });
+  });
+
+  form.addEventListener('input', (e) => {
+    const snap = e.target !== termEl;
+    update({ snap });
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  update();
+</script>
