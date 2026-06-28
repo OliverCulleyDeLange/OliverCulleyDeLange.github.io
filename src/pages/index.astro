@@ -15,11 +15,14 @@ const posts = (await getCollection('posts')).sort(
     <h2 class="section-heading">Projects</h2>
     <ul class="project-cards">
       {projects.map(project => {
-        const { name, tagline, appUrl, appLabel, githubUrl } = project.data;
+        const { name, tagline, appUrl, appLabel, githubUrl, relatedPosts } = project.data;
+        const primaryHref = relatedPosts.length === 1
+          ? `/posts/${relatedPosts[0]}/`
+          : `/projects/${project.id}/`;
         return (
           <li class="project-card">
             <div class="project-card-body">
-              <h3><a href={`/projects/${project.id}/`}>{name}</a></h3>
+              <h3><a href={primaryHref}>{name}</a></h3>
               <p>{tagline}</p>
             </div>
             <div class="project-card-actions">
@@ -30,7 +33,7 @@ const posts = (await getCollection('posts')).sort(
                   </svg>
                 </a>
               )}
-              <a href={`/projects/${project.id}/`} class="btn btn-ghost btn-sm">Learn more</a>
+              <a href={primaryHref} class="btn btn-ghost btn-sm">Learn more</a>
               {appUrl && (
                 <a href={appUrl} class="btn btn-primary btn-sm" target="_blank" rel="noopener">{appLabel ?? 'Open app'}</a>
               )}
