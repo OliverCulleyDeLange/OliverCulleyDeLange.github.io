@@ -169,7 +169,8 @@ function usableDeskHeight() {
   return dockTop > 0 ? Math.min(h, dockTop - 8) : h;
 }
 
-/* New desktop windows are horizontally centred and use all space above the dock. */
+/* New windows get the available height first. Native windows are then trimmed
+   to their content when it does not need that space (see fitWindowToContent). */
 function nextRect(preferred) {
   const { w, h } = deskRect();
   if (MOBILE()) {
@@ -179,6 +180,29 @@ function nextRect(preferred) {
   const wh = Math.max(120, usableDeskHeight() - 8);
   const x = Math.round((w - ww) / 2);
   return { x, y: 4, w: ww, h: wh };
+}
+
+function fitWindowToContent(win) {
+  if (win.maximised || win.kind === 'app' || win.el.hidden) return;
+
+  const { body, el } = win;
+  // A flex child normally stretches to fill its parent, which makes its
+  // scrollHeight unsuitable for deciding whether the parent has spare room.
+  // Temporarily let it size itself so we can measure the actual content.
+  const saved = {
+    flex: body.style.flex,
+    height: body.style.height,
+    overflow: body.style.overflow,
+  };
+  Object.assign(body.style, { flex: '0 0 auto', height: 'auto', overflow: 'visible' });
+  const bodyHeight = body.offsetHeight;
+  Object.assign(body.style, saved);
+
+  const chromeHeight = el.offsetHeight - body.offsetHeight;
+  const maxHeight = Math.max(120, usableDeskHeight() - el.offsetTop - 4);
+  const height = Math.min(maxHeight, Math.max(120, Math.ceil(chromeHeight + bodyHeight)));
+  el.style.height = height + 'px';
+  saveWindowSession();
 }
 
 function focusWin(win) {
@@ -310,6 +334,8 @@ function openWindow(opts) {
     id: opts.id, el, body, title: opts.title, url: opts.url || null,
     openUrl, kind: opts.kind || 'page', icon: opts.icon || 'doc',
     minimised: false, maximised: false, saved: null, z: 0,
+    fitContent: opts.fitContent ?? opts.kind !== 'app',
+    forceFitContent: opts.forceFitContent ?? false,
   };
   wins.set(opts.id, win);
 
@@ -334,6 +360,9 @@ function openWindow(opts) {
   focusWin(win);
   if (MOBILE()) win.maximised = false;
   saveWindowSession();
+  if (win.fitContent && !opts.contentPending && (!opts.rect || win.forceFitContent)) {
+    requestAnimationFrame(() => fitWindowToContent(win));
+  }
   return win;
 }
 
@@ -503,7 +532,8 @@ async function openPage(url, opts = {}) {
   const win = openWindow({
     id, url, title: opts.title || 'Loading…', kind: 'page',
     icon: opts.icon || 'doc', html: '<p class="win-loading">Loading…</p>',
-    size: opts.size || { w: 660, h: 480 }, rect: opts.rect,
+    size: opts.size || { w: 660, h: 480 }, rect: opts.rect, contentPending: true,
+    forceFitContent: opts.forceFitContent,
   });
   try {
     const page = await fetchPage(url);
@@ -511,6 +541,9 @@ async function openPage(url, opts = {}) {
     win.title = opts.title || page.title;
     win.el.querySelector('.win-title').textContent = win.title;
     win.el.setAttribute('aria-label', win.title);
+    if (win.fitContent && (!opts.rect || win.forceFitContent)) {
+      requestAnimationFrame(() => fitWindowToContent(win));
+    }
     syncDock();
   } catch (err) {
     win.body.innerHTML = `<p class="win-loading">Could not open ${url}</p>`;
@@ -604,7 +637,7 @@ function drawCvTimeline(body) {
 
 function openProject(project) {
   const infoUrl = `/projects/${project.id}/`;
-  const { w, h } = deskRect();
+  const { w } = deskRect();
 
   if (!project.appUrl) {
     openPage(infoUrl, { title: project.name + ' — Info', icon: project.icon });
@@ -625,12 +658,13 @@ function openProject(project) {
   const infoW = Math.min(400, Math.round(w * 0.34));
   const gap = 12;
   const appW = Math.min(900, w - infoW - gap * 3);
-  const appH = Math.min(600, h - gap * 2);
+  const appH = Math.max(120, usableDeskHeight() - gap - 4);
 
   openPage(infoUrl, {
     title: project.name + ' — Info',
     icon: project.icon,
-    rect: { x: gap, y: gap, w: infoW, h: Math.min(560, h - gap * 2) },
+    rect: { x: gap, y: gap, w: infoW, h: appH },
+    forceFitContent: true,
   });
   openWindow({
     id: 'app:' + project.id,
@@ -1346,6 +1380,7 @@ function openSettings(opts = {}) {
   openWindow({
     id: 'settings', title: 'Settings', kind: 'folder',
     icon: 'monogram', node, size: { w: 400, h: 440 }, rect: opts.rect,
+    forceFitContent: true,
   });
 }
 
