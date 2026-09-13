@@ -550,9 +550,9 @@ const rateNote = boeRate.date
             },
           },
         },
-        // @ts-expect-error custom plugin opts
+        // @ts-ignore Chart.js custom plugin option
         selectedTerm: { term: Number(termEl.value), color: colors.muted },
-        // @ts-expect-error custom plugin opts
+        // @ts-ignore Chart.js custom plugin option
         budgetLine: { value: 0, color: colors.warm },
       },
       scales: {
@@ -776,8 +776,9 @@ const rateNote = boeRate.date
     chart.update();
 
     const amort = computeAmortization(amount, rate, selectedTerm);
-    amortChart.data.datasets[0].data = amort.capital;
-    amortChart.data.datasets[1].data = amort.interestPaid;
+    const amortDatasets = amortChart.data.datasets as Array<{ data: typeof amort.capital }>;
+    amortDatasets[0].data = amort.capital;
+    amortDatasets[1].data = amort.interestPaid;
     (amortChart.options.scales as any).x.max = selectedTerm;
     amortChart.update();
   }

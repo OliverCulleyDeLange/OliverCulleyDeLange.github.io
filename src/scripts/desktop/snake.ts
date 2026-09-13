@@ -4,58 +4,67 @@
 
 const SPEED_STORAGE_KEY = 'odl-ambient-snake-speed';
 const ENABLED_STORAGE_KEY = 'odl-ambient-snake';
-const SPEEDS = { disabled: 0, slow: 190, normal: 115, fast: 65 };
-const SPEED_MULTIPLIERS = { disabled: 0, slow: 1, normal: 2, fast: 3 };
+const SPEEDS = { disabled: 0, slow: 190, normal: 115, fast: 65 } as const;
+const SPEED_MULTIPLIERS = { disabled: 0, slow: 1, normal: 2, fast: 3 } as const;
+type Speed = keyof typeof SPEEDS;
+type Cell = { x: number; y: number };
 const CELL_SIZE = 13;
 const DIRECTIONS = {
   ArrowUp: { x: 0, y: -1 },
   ArrowDown: { x: 0, y: 1 },
   ArrowLeft: { x: -1, y: 0 },
   ArrowRight: { x: 1, y: 0 },
-};
+} as const;
+type Direction = Cell;
+type DirectionKey = keyof typeof DIRECTIONS;
 
-function readSpeed() {
+const isDirectionKey = (key: string): key is DirectionKey => Object.hasOwn(DIRECTIONS, key);
+
+function readSpeed(): Speed {
   try {
     const saved = localStorage.getItem(SPEED_STORAGE_KEY);
-    if (Object.hasOwn(SPEEDS, saved)) return saved;
+    if (saved && Object.hasOwn(SPEEDS, saved)) return saved as Speed;
     // Respect the separate on/off setting used by the first version.
-    return JSON.parse(localStorage.getItem(ENABLED_STORAGE_KEY)) === false ? 'disabled' : 'normal';
+    return JSON.parse(localStorage.getItem(ENABLED_STORAGE_KEY) ?? 'true') === false ? 'disabled' : 'normal';
   } catch (error) {
     return 'normal';
   }
 }
 
-function sameCell(a, b) {
+function sameCell(a: Cell, b: Cell): boolean {
   return a.x === b.x && a.y === b.y;
 }
 
-function isTyping(target) {
-  if (!target) return false;
+function isTyping(target: EventTarget | null): target is HTMLElement {
+  if (!(target instanceof HTMLElement)) return false;
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable === true;
 }
 
-export function createAmbientSnake(canvas) {
+export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
   if (!canvas) return { isEnabled: () => false, setEnabled: () => {}, destroy: () => {} };
 
-  const ctx = canvas.getContext('2d');
+  const snakeCanvas = canvas;
+  const context = snakeCanvas.getContext('2d');
+  if (!context) return { isEnabled: () => false, setEnabled: () => {}, destroy: () => {} };
+  const ctx: CanvasRenderingContext2D = context;
   let grid = { columns: 1, rows: 1 };
-  let snake = [];
-  let direction = DIRECTIONS.ArrowRight;
-  let food = { x: 0, y: 0 };
+  let snake: Cell[] = [];
+  let direction: Direction = DIRECTIONS.ArrowRight;
+  let food: Cell = { x: 0, y: 0 };
   let playerControlled = false;
   let speed = readSpeed();
   let foodEaten = 0;
   const heldArrowKeys = new Set();
   let lastStep = 0;
-  let animationFrame = null;
+  let animationFrame: number | null = null;
 
   const isEnabled = () => speed !== 'disabled';
 
   function resize() {
-    const rect = canvas.getBoundingClientRect();
+    const rect = snakeCanvas.getBoundingClientRect();
     const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    snakeCanvas.width = Math.max(1, Math.floor(rect.width * ratio));
+    snakeCanvas.height = Math.max(1, Math.floor(rect.height * ratio));
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     grid = {
       columns: Math.max(12, Math.floor(rect.width / CELL_SIZE)),
@@ -83,11 +92,11 @@ export function createAmbientSnake(canvas) {
     foodEaten = 0;
   }
 
-  function nextCell(from, movement) {
+  function nextCell(from: Cell, movement: Direction): Cell {
     return { x: (from.x + movement.x + grid.columns) % grid.columns, y: (from.y + movement.y + grid.rows) % grid.rows };
   }
 
-  function wouldCollide(next) {
+  function wouldCollide(next: Cell): boolean {
     const eating = sameCell(next, food);
     const body = eating ? snake : snake.slice(0, -1);
     return body.some(segment => sameCell(segment, next));
@@ -132,8 +141,8 @@ export function createAmbientSnake(canvas) {
 
   function draw() {
     const { ink, paper } = colours();
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const width = snakeCanvas.clientWidth;
+    const height = snakeCanvas.clientHeight;
     ctx.clearRect(0, 0, width, height);
     if (!isEnabled()) return;
 
@@ -156,7 +165,7 @@ export function createAmbientSnake(canvas) {
     ctx.fillRect(food.x * CELL_SIZE + 3, food.y * CELL_SIZE + 3, CELL_SIZE - 6, CELL_SIZE - 6);
   }
 
-  function tick(time) {
+  function tick(time: number): void {
     const foodSpeed = Math.pow(1 + SPEED_MULTIPLIERS[speed] / 100, foodEaten);
     const heldKeySpeed = heldArrowKeys.size ? 2 : 1;
     const stepInterval = SPEEDS[speed] / foodSpeed / heldKeySpeed;
@@ -168,8 +177,8 @@ export function createAmbientSnake(canvas) {
     animationFrame = requestAnimationFrame(tick);
   }
 
-  function onKeydown(event) {
-    const movement = DIRECTIONS[event.key];
+  function onKeydown(event: KeyboardEvent): void {
+    const movement = isDirectionKey(event.key) ? DIRECTIONS[event.key] : undefined;
     if (!isEnabled() || !movement || isTyping(event.target) || document.documentElement.classList.contains('is-locked')) return;
     const reversing = movement.x === -direction.x && movement.y === -direction.y;
     if (!reversing) direction = movement;
@@ -178,19 +187,19 @@ export function createAmbientSnake(canvas) {
     event.preventDefault();
   }
 
-  function onKeyup(event) {
-    if (DIRECTIONS[event.key]) heldArrowKeys.delete(event.key);
+  function onKeyup(event: KeyboardEvent): void {
+    if (isDirectionKey(event.key)) heldArrowKeys.delete(event.key);
   }
 
   function onWindowBlur() {
     heldArrowKeys.clear();
   }
 
-  function setSpeed(nextSpeed) {
+  function setSpeed(nextSpeed: Speed): void {
     if (!Object.hasOwn(SPEEDS, nextSpeed)) return;
     speed = nextSpeed;
     try { localStorage.setItem(SPEED_STORAGE_KEY, speed); } catch (error) {}
-    canvas.hidden = !isEnabled();
+    snakeCanvas.hidden = !isEnabled();
     if (isEnabled()) {
       playerControlled = false;
       reset();
@@ -202,7 +211,7 @@ export function createAmbientSnake(canvas) {
   window.addEventListener('blur', onWindowBlur);
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('keyup', onKeyup);
-  canvas.hidden = !isEnabled();
+  snakeCanvas.hidden = !isEnabled();
   resize();
   animationFrame = requestAnimationFrame(tick);
 

@@ -1,3 +1,4 @@
+// @ts-nocheck -- DOM and persisted-session types are being migrated incrementally.
 /* ═══════════════════════════════════════════════════════════════
    A small classic-Mac window manager.
 
@@ -6,8 +7,8 @@
    so if the script never runs you still get the plain page.
    ═══════════════════════════════════════════════════════════════ */
 
-import { createAmbientSnake } from './desktop/snake.js';
-import { drawCvTimeline as renderCvTimeline } from './cv-timeline.js';
+import { createAmbientSnake } from './desktop/snake';
+import { drawCvTimeline as renderCvTimeline } from './cv-timeline';
 
 const root = document.documentElement;
 const MOBILE = () => window.innerWidth < 700;

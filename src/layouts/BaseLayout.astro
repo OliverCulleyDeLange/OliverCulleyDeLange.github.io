@@ -32,7 +32,8 @@ const projects = (await getCollection('projects')).sort(
 
 const allPosts = await getCollection('posts');
 const postById = new Map(allPosts.map(post => [post.id, post]));
-const byDateDesc = (a, b) => b.data.date.valueOf() - a.data.date.valueOf();
+const byDateDesc = (a: (typeof allPosts)[number], b: (typeof allPosts)[number]) =>
+  b.data.date.valueOf() - a.data.date.valueOf();
 
 /* Projects menu launches the deployed app when there is one. */
 const projectHref = (project: (typeof projects)[number]) => {
@@ -385,7 +386,7 @@ const iconNames = [...new Set([
     </main>
 
     {isDesktopShell && <script>
-      import '../scripts/desktop.js';
+      import '../scripts/desktop';
     </script>}
 
     {isDesktopShell && <script is:inline>

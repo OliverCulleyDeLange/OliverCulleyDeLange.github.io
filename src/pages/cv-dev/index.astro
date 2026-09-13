@@ -1,19 +1,85 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import cvSource from '../../content/cv.html?raw';
-
-const cvBody = (cvSource.match(/<body>([\s\S]*?)\s*<script type="text\/javascript"/i)?.[1] ?? '')
-  .replace(
-    'href="carv_rating.png"',
-    'href="/assets/images/carv/rating.png" target="_blank" rel="noopener"',
-  );
 ---
 
 <BaseLayout title="CV" description="Oliver Culley De Lange's CV" windowTitle="CV" wide>
-  <article class="cv-page" set:html={cvBody}></article>
+  <article class="cv-page">
+    <div class="page">
+      <header>
+        <h1><strong>OLIVER</strong> CULLEY DE LANGE</h1>
+        <div class="contact-details">
+          <div class="contact-detail">E-mail: <strong><a href="mailto:hireme@oliverdelange.co.uk">hireme@oliverdelange.co.uk</a></strong></div>
+          <div class="contact-detail">Website: <strong><a href="http://oliverdelange.co.uk">oliverdelange.co.uk</a></strong></div>
+          <div class="contact-detail">GitHub: <strong><a href="https://github.com/OliverCulleyDeLange">OliverCulleyDeLange</a></strong></div>
+        </div>
+      </header>
+
+      <section>
+        <h3>Summary</h3>
+        <p>A <strong>T shaped full stack</strong> software engineer with a strong <strong>product and customer experience</strong> focus. Specialising in <strong>Android</strong>, but experience in <strong>server side and web front end</strong> too.</p>
+        <p>Currently a <strong>Senior Android</strong> engineer at <a href="https://getcarv.com">Carv</a>, with <strong>rust</strong> and <strong>typescript</strong>.</p>
+        <p>I'm playing with <strong>Svelte</strong> on web for fun, building a web based grid notation tool <a href="https://oliverdelange.co.uk/grvmkr/">GrvMkr</a>. I'm exploring <strong>Kotlin Multiplatform</strong> for <a href="https://github.com/OliverCulleyDeLange/location-alarm">personal projects</a>. I'm embracing vibe coding, and building small apps like <a href="https://oliverdelange.co.uk/projects/schengen-calculator/">Schengen Calculator</a> and <a href="https://oliverdelange.co.uk/projects/six-second-scribbles">Six Second Scribbles</a>.</p>
+        <h3>Timeline</h3>
+        <div id="timeline" aria-label="Career timeline"></div>
+        <section class="right">
+          <h3>Interests</h3>
+          <p>I’m a <strong>rock climber</strong> first, a <strong>skier</strong> second and a <strong>mountain biker</strong> third.</p>
+          <p>I also enjoy <strong>producing electronic music</strong>. That's not to say it's any good though.</p>
+        </section>
+        <h3>Personal project links</h3>
+        <ul>
+          <li><a href="https://oliverdelange.co.uk/grvmkr/">GrvMkr:</a> a <strong>Svelte</strong> web tool for creating, playing and sharing percussive grooves.</li>
+          <li><a href="https://github.com/OliverCulleyDeLange/location-alarm">Location Alarm:</a> a <strong>Kotlin Multiplatform</strong> project which I used to learn KMM &amp; iOS (SwiftUI) development.</li>
+          <li><a href="https://oliverdelange.co.uk/projects/We_climb_rocks/">WeClimb.Rocks:</a> an <strong>Android</strong> climbing app which I used to learn Android development.</li>
+          <li><a href="https://github.com/OliverCulleyDeLange/ctw_flutter">Cheat to Win:</a> a <strong>Flutter</strong> game which I used to self learn about various available widgets and APIs.</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="page">
+      <section class="left">
+        <h3>Career History</h3>
+        <h4><strong>Motion Metrics Ltd (Carv)</strong>: Apr 2020 – May 2024 (Junior/Mid), Sept 2025 – Present (Senior)</h4>
+        <ol><li><h5><strong>Android Engineer</strong></h5></li></ol>
+        <p>As the second software hire in this small start up, I <strong>owned the Android codebase</strong> and contributed to the shared <strong>rust 'engine'</strong> code too.</p>
+        <p>Read a detailed account of my time at Carv <a href="https://oliverdelange.co.uk/work/My_time_at_carv/">here</a>.</p>
+        <p>I increased Carv's Play Store rating from <a href="/assets/images/carv/rating.png" target="_blank" rel="noopener"><strong>3.3 to 4.7</strong></a> by:</p>
+        <ol>
+          <li>Debugging and mitigating a number of tricky long standing issues such as <strong><a href="https://getcarv.com/blog/android-battery-optimisation">app deaths</a></strong>, <strong><a href="https://issuetracker.google.com/issues/180218747#comment15">GPS</a></strong>, bluetooth <strong><a href="https://getcarv.com/blog/android-data-transmission">connection</a></strong> and <strong><a href="https://getcarv.com/blog/snapdragon-865-bluetooth-issues">corruption</a></strong>, and <strong><a href="https://issuetracker.google.com/issues/220161109">GATT133</a></strong> issues.</li>
+          <li>Quickly developing <strong>high quality</strong> features, such as activity tracking, ski coaching, leaderboards, video coaching, onboarding, sensor management and piste mapping.</li>
+          <li>Leading the <strong>QA</strong> process, and standardising the release process for Android and iOS.</li>
+          <li>Providing quality <strong>support</strong> for customers and team mates.</li>
+        </ol>
+        <p>I also contributed to internal systems such as <strong>SvelteKit</strong> map based activity debugging tooling.</p>
+
+        <h4><strong>Telefonica O2 Ltd</strong>: Sept 2012 – May 2019</h4>
+        <ol>
+          <li>
+            <h5><strong>Full stack developer (The Lab)</strong> July 2018 – May 2019</h5>
+            <p>I developed a number of small <strong>proof of concept</strong> applications / systems:</p>
+            <ul>
+              <li>Forecasting network capacity issues based on existing data.</li>
+              <li>Technical analysis of <strong>Flutter</strong> for developing mobile apps.</li>
+              <li><strong>MQTT</strong> brokers (mosquitto) in <strong>Vagrant</strong> for testing <strong>IoT</strong> authentication methods.</li>
+            </ul>
+          </li>
+          <li>
+            <h5><strong>Software Engineer (Digital Products)</strong> July 2014 – July 2018</h5>
+            <p><strong>O2 Drive</strong> – I developed <strong>backend services and middleware</strong> for O2's car insurance offering. I also contributed to the O2 Drive Android App.</p>
+            <p><strong><a href="https://www.o2.co.uk/shop">O2 Online Shop</a></strong> – I added functionality to view existing tariff usage alongside upgrade options and recommendations, to give customers a <strong>better upgrade experience</strong>. I wrote both <strong>Java and JavaScript (Angular)</strong> for this application.</p>
+            <p><strong>O2 Checkout</strong> – Contributed to O2's checkout rewrite to reduce complexity. Conversion rates rose 31%, and upgrade net sales value rose 52%.</p>
+          </li>
+          <li>
+            <h5><strong>Apprentice</strong> Sept 2012 – July 2014</h5>
+            <p>Automated report development using <strong>VBA</strong> with Microsoft Excel and Access. <strong>PKI</strong> for O2's 4G rollout. Web based <strong>map tool</strong> to display O2 cell sites and related data geographically.</p>
+          </li>
+        </ol>
+      </section>
+    </div>
+  </article>
 </BaseLayout>
 
 <script>
-  import { drawCvTimeline } from '../../scripts/cv-timeline.js';
+  import { drawCvTimeline } from '../../scripts/cv-timeline';
   drawCvTimeline();
 </script>
