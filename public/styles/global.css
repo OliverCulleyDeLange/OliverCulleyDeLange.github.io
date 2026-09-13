@@ -118,6 +118,43 @@ body {
   min-height: 100vh;
 }
 
+/* A project, post, or tool opened at its own URL is a document, not a
+   window inside the homepage's desktop. Keep the content comfortably
+   readable while deliberately leaving the desktop chrome behind. */
+body.standalone-page {
+  background: var(--paper);
+  background-image: none;
+  padding: 0;
+}
+
+.standalone-page main {
+  width: min(100%, var(--max-width));
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 3.5rem;
+}
+
+.standalone-page main:has(.window-wide) {
+  width: min(100%, 980px);
+}
+
+.standalone-page .window {
+  max-width: none;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.standalone-page .title-bar,
+.standalone-page .status-bar {
+  display: none;
+}
+
+.standalone-page .window-body {
+  padding: 0;
+  background: transparent;
+}
+
 a {
   color: var(--ink);
   text-decoration: underline;
@@ -183,8 +220,7 @@ a:hover {
   line-height: 1;
 }
 
-.menu-item:hover,
-.menu-item:focus-within {
+.menu-item.is-open {
   background: var(--ink);
   color: var(--paper);
 }
@@ -204,8 +240,7 @@ a:hover {
 }
 
 /* The disc follows currentColor; the letter must become whatever is behind it */
-.menu-item:hover .monogram,
-.menu-item:focus-within .monogram {
+.menu-item.is-open .monogram {
   --knockout: var(--ink);
 }
 
@@ -225,8 +260,7 @@ a:hover {
   flex-direction: column;
 }
 
-.menu-item:hover > .menu-dropdown,
-.menu-item:focus-within > .menu-dropdown {
+.menu-item.is-open > .menu-dropdown {
   display: flex;
 }
 
@@ -287,8 +321,7 @@ a:hover {
   border-bottom: 4px solid transparent;
 }
 
-.menu-dropdown .has-submenu:hover > .submenu-label,
-.menu-dropdown .has-submenu:focus-within > .submenu-label {
+.menu-dropdown .has-submenu.is-open > .submenu-label {
   background: var(--ink);
   color: var(--paper);
 }
@@ -309,8 +342,7 @@ a:hover {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
-.menu-dropdown .has-submenu:hover > .submenu,
-.menu-dropdown .has-submenu:focus-within > .submenu {
+.menu-dropdown .has-submenu.is-open > .submenu {
   display: block;
 }
 
@@ -1915,7 +1947,8 @@ html.is-framed .window-body {
 
 /* ── Lock screen ── */
 .lock-screen[hidden],
-.lock-dialog[hidden] {
+.lock-dialog[hidden],
+.lock-login[hidden] {
   display: none;
 }
 
@@ -1942,15 +1975,29 @@ html.is-locked body {
 }
 
 .lock-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
+  display: grid;
+  place-items: center;
   padding: 1.75rem 2rem;
   background: var(--paper);
   border: 1px solid var(--ink);
   box-shadow: 2px 2px 0 var(--ink);
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 2rem));
+  height: 240px;
   max-width: calc(100vw - 2rem);
+}
+
+.lock-login,
+.lock-dialog {
+  grid-area: 1 / 1;
+}
+
+.lock-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
 }
 
 .lock-name {
@@ -2012,7 +2059,10 @@ html.is-locked body {
 }
 
 .lock-dialog {
-  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
 }
 
 .lock-dialog .dialog-text p:first-child {

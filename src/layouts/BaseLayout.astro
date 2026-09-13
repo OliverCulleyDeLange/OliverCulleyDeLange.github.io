@@ -21,6 +21,11 @@ const siteTitle = 'oliverdelange';
 const pageTitle = title ? `${title} | ${siteTitle}` : siteTitle;
 const barTitle = windowTitle ?? title ?? siteTitle;
 
+/* The homepage is the interactive desktop. Every other route is also a
+   shareable, standalone document: opening its full URL should show the
+   content itself, rather than booting a desktop around it. */
+const isDesktopShell = Astro.url.pathname === '/';
+
 const projects = (await getCollection('projects')).sort(
   (a, b) => (a.data.order ?? 99) - (b.data.order ?? 99)
 );
@@ -115,21 +120,23 @@ const iconNames = [...new Set([
           document.documentElement.setAttribute('data-theme', saved);
         }
       } catch (e) {}
-      /* Avoid a flash of the plain page before the desktop mounts.
-         The timeout is a safety net: if the script fails, content comes back. */
-      document.documentElement.classList.add('desktop-boot');
-      setTimeout(function () {
-        document.documentElement.classList.remove('desktop-boot');
-      }, 4000);
+      {isDesktopShell && `
+        /* Avoid a flash of the plain page before the desktop mounts.
+           The timeout is a safety net: if the script fails, content comes back. */
+        document.documentElement.classList.add('desktop-boot');
+        setTimeout(function () {
+          document.documentElement.classList.remove('desktop-boot');
+        }, 4000);
+      `}
     </script>
     <script data-goatcounter="https://ocd.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   </head>
-  <body>
-    <div class="boot-screen" id="boot-screen" hidden>
+  <body class:list={[!isDesktopShell && 'standalone-page']}>
+    {isDesktopShell && <div class="boot-screen" id="boot-screen" hidden>
       <MacIcon name="happymac" size={128} class="boot-mac" />
       <p class="boot-caption">Welcome to oliverdelange</p>
-    </div>
-    <script is:inline>
+    </div>}
+    {isDesktopShell && <script is:inline>
       (function () {
         try {
           var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -150,9 +157,9 @@ const iconNames = [...new Set([
           window.addEventListener('keydown', skip, { once: true });
         } catch (e) {}
       })();
-    </script>
+    </script>}
 
-    <nav class="menu-bar" aria-label="Main">
+    {isDesktopShell && <nav class="menu-bar" aria-label="Main">
       <ul>
         <li class="menu-item menu-item-logo" tabindex="0">
           <span class="menu-label" aria-label="Apple menu">
@@ -243,9 +250,9 @@ const iconNames = [...new Set([
           <span class="menu-time" id="menu-time"></span>
         </span>
       </div>
-    </nav>
+    </nav>}
 
-    <div class="desktop" id="desktop" hidden>
+    {isDesktopShell && <div class="desktop" id="desktop" hidden>
       <ul class="desk-icons" id="desk-icons">
         {deskIcons.map(item => (
           <li class="desk-icon" data-id={item.id} tabindex="0" role="button" aria-label={`Open ${item.name}`}>
@@ -266,9 +273,9 @@ const iconNames = [...new Set([
         ))}
       </ul>
       <div class="win-layer" id="win-layer"></div>
-    </div>
+    </div>}
 
-    <div class="dock" id="dock" hidden>
+    {isDesktopShell && <div class="dock" id="dock" hidden>
       <button class="dock-item dock-browser" id="dock-browser" type="button" aria-label="Current window">
         <MacIcon name="monogram" size={28} />
         <span class="dock-label" id="dock-browser-label">oliverdelange</span>
@@ -284,37 +291,35 @@ const iconNames = [...new Set([
         </svg>
         <span class="dock-label">Trash</span>
       </button>
-    </div>
+    </div>}
 
-    <div class="lock-screen" id="lock-screen" hidden>
+    {isDesktopShell && <div class="lock-screen" id="lock-screen" hidden>
       <div class="lock-inner">
-        <MacIcon name="monogram" size={64} />
-        <p class="lock-name">oliverdelange</p>
-        <form class="lock-form" id="lock-form">
-          <input type="password" id="lock-pass" name="lock-pass" placeholder="Password"
-                 autocomplete="off" aria-label="Password" />
-          <button type="submit" class="btn btn-primary btn-sm">Log In</button>
-        </form>
-        <p class="lock-error" id="lock-error" hidden>Incorrect password.</p>
-        <button type="button" class="lock-forgot" id="lock-forgot">Forgot my password?</button>
-      </div>
+        <div class="lock-login" id="lock-login">
+          <MacIcon name="monogram" size={64} />
+          <p class="lock-name">oliverdelange</p>
+          <form class="lock-form" id="lock-form">
+            <input type="password" id="lock-pass" name="lock-pass" placeholder="Password"
+                   autocomplete="off" aria-label="Password" />
+            <button type="submit" class="btn btn-primary btn-sm">Log In</button>
+          </form>
+          <p class="lock-error" id="lock-error" hidden>Incorrect password.</p>
+          <button type="button" class="lock-forgot" id="lock-forgot">Forgot my password?</button>
+        </div>
 
-      <div class="dialog lock-dialog" id="lock-dialog" hidden role="alertdialog" aria-live="assertive">
-        <div class="dialog-inner">
-          <div class="dialog-body">
-            <MacIcon name="bomb" size={36} />
-            <div class="dialog-text">
-              <p>you muppet</p>
-              <p class="lock-dialog-note">Letting you back in anyway&hellip;</p>
-            </div>
+        <div class="lock-dialog" id="lock-dialog" hidden role="alertdialog" aria-live="assertive">
+          <MacIcon name="bomb" size={36} />
+          <div class="dialog-text">
+            <p>you muppet</p>
+            <p class="lock-dialog-note">Letting you back in anyway&hellip;</p>
           </div>
         </div>
       </div>
-    </div>
+    </div>}
 
-    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    {isDesktopShell && <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>}
 
-    <div class="dialog dock-hint" id="dock-hint" hidden role="alertdialog" aria-live="polite">
+    {isDesktopShell && <div class="dialog dock-hint" id="dock-hint" hidden role="alertdialog" aria-live="polite">
       <div class="dialog-inner">
         <div class="dialog-body">
           <MacIcon name="monogram" size={36} />
@@ -326,21 +331,21 @@ const iconNames = [...new Set([
           <button type="button" class="btn btn-primary btn-sm" id="dock-hint-ok">OK</button>
         </div>
       </div>
-    </div>
+    </div>}
 
-    <ul class="context-menu" id="context-menu" hidden role="menu">
+    {isDesktopShell && <ul class="context-menu" id="context-menu" hidden role="menu">
       <li role="none">
         <button type="button" id="ctx-cleanup" role="menuitem">Clean Up Desktop</button>
       </li>
-    </ul>
+    </ul>}
 
-    <div id="icon-templates" hidden>
+    {isDesktopShell && <div id="icon-templates" hidden>
       {iconNames.map(name => (
         <template data-icon={name}><MacIcon name={name as any} size={32} /></template>
       ))}
-    </div>
+    </div>}
 
-    <script type="application/json" id="desktop-data" set:html={JSON.stringify(desktopData)}></script>
+    {isDesktopShell && <script type="application/json" id="desktop-data" set:html={JSON.stringify(desktopData)}></script>}
 
     <main>
       <div class:list={['window', wide && 'window-wide']}>
@@ -363,11 +368,11 @@ const iconNames = [...new Set([
       </div>
     </main>
 
-    <script>
+    {isDesktopShell && <script>
       import '../scripts/desktop.js';
-    </script>
+    </script>}
 
-    <script is:inline>
+    {isDesktopShell && <script is:inline>
       (function () {
         var dateEl = document.getElementById('menu-date');
         var timeEl = document.getElementById('menu-time');
@@ -384,6 +389,6 @@ const iconNames = [...new Set([
         tick();
         setInterval(tick, 20000);
       })();
-    </script>
+    </script>}
   </body>
 </html>

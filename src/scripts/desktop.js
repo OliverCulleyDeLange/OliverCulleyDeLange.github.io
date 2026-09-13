@@ -59,6 +59,95 @@ const iconSvg = name => {
   return tpl ? tpl.content.cloneNode(true) : document.createDocumentFragment();
 };
 
+/* ── Menu bar ────────────────────────────────────────────────
+   Menus are deliberately click controlled so touch devices do not open a
+   menu while the user is simply scrolling or moving between controls. */
+const menuBar = document.querySelector('.menu-bar');
+const menuItems = [...document.querySelectorAll('.menu-bar > ul > .menu-item')];
+const submenuItems = [...document.querySelectorAll('.menu-dropdown > .has-submenu')];
+
+function closeSubmenus(except = null) {
+  submenuItems.forEach(item => {
+    if (item !== except) item.classList.remove('is-open');
+  });
+}
+
+function closeMenus(except = null) {
+  menuItems.forEach(item => {
+    if (item !== except) item.classList.remove('is-open');
+  });
+  closeSubmenus();
+}
+
+function openMenu(item) {
+  closeMenus(item);
+  item?.classList.add('is-open');
+}
+
+menuItems.forEach(item => {
+  item.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      item.focus();
+      closeMenus();
+    } else if ((event.key === 'Enter' || event.key === ' ') && event.target === item) {
+      event.preventDefault();
+      if (item.classList.contains('is-open')) {
+        closeMenus();
+      } else {
+        openMenu(item);
+        item.querySelector('.menu-dropdown a, .menu-dropdown button')?.focus();
+      }
+    }
+  });
+});
+
+submenuItems.forEach(item => {
+  item.addEventListener('keydown', event => {
+    if ((event.key === 'Enter' || event.key === ' ') && event.target === item) {
+      event.preventDefault();
+      if (item.classList.contains('is-open')) {
+        closeSubmenus();
+      } else {
+        closeSubmenus(item);
+        item.classList.add('is-open');
+        item.querySelector('.submenu a')?.focus();
+      }
+    }
+  });
+});
+
+menuBar?.addEventListener('click', event => {
+  const item = event.target.closest('.menu-item');
+  if (!item) return;
+
+  if (event.target.closest('.menu-label')) {
+    event.preventDefault();
+    item.classList.contains('is-open') ? closeMenus() : openMenu(item);
+    return;
+  }
+
+  const submenu = event.target.closest('.has-submenu');
+  if (submenu && event.target.closest('.submenu-label')) {
+    event.preventDefault();
+    if (submenu.classList.contains('is-open')) {
+      closeSubmenus();
+    } else {
+      closeSubmenus(submenu);
+      submenu.classList.add('is-open');
+    }
+    return;
+  }
+
+  if (event.target.closest('.menu-dropdown a, .menu-dropdown button')) closeMenus();
+});
+
+menuBar?.addEventListener('focusout', event => {
+  if (!menuBar.contains(event.relatedTarget)) closeMenus();
+});
+document.addEventListener('pointerdown', event => {
+  if (!menuBar?.contains(event.target)) closeMenus();
+});
+
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
 function deskRect() {
@@ -987,6 +1076,7 @@ const lockPass = document.getElementById('lock-pass');
 const lockError = document.getElementById('lock-error');
 const lockDialog = document.getElementById('lock-dialog');
 const lockForgot = document.getElementById('lock-forgot');
+const lockLogin = document.getElementById('lock-login');
 let forgetting = false;
 
 function lock() {
@@ -996,6 +1086,7 @@ function lock() {
   root.classList.add('is-locked');
   if (lockError) lockError.hidden = true;
   if (lockDialog) lockDialog.hidden = true;
+  if (lockLogin) lockLogin.hidden = false;
   if (lockPass) { lockPass.value = ''; lockPass.focus(); }
 }
 
@@ -1005,6 +1096,7 @@ function unlock() {
   root.classList.remove('is-locked');
   forgetting = false;
   if (lockDialog) lockDialog.hidden = true;
+  if (lockLogin) lockLogin.hidden = false;
 }
 
 lockForm?.addEventListener('submit', e => {
@@ -1024,6 +1116,7 @@ lockForgot?.addEventListener('click', () => {
   if (forgetting) return;
   forgetting = true;
   lockError.hidden = true;
+  lockLogin.hidden = true;
   lockDialog.hidden = false;
   setTimeout(unlock, 2000);
 });
