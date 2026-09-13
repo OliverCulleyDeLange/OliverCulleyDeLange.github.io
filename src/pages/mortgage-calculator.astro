@@ -54,6 +54,8 @@ const rateNote = boeRate.date
 <BaseLayout
   title="UK Mortgage Calculator"
   description="See how the monthly payment on a UK repayment mortgage changes with term length, for a given loan amount and interest rate."
+  windowTitle="Mortgage Calculator"
+  wide
 >
   <article class="mortgage-calc">
     <header class="mortgage-calc-header">
@@ -164,7 +166,7 @@ const rateNote = boeRate.date
 
   .quick-estimate {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0;
     padding: 0.75rem 1rem;
     margin-bottom: 1.25rem;
   }
@@ -193,7 +195,7 @@ const rateNote = boeRate.date
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 0;
   }
   .quick-estimate-grid input:focus {
     outline: 2px solid var(--accent);
@@ -226,7 +228,7 @@ const rateNote = boeRate.date
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 0;
   }
   .mortgage-form input[type="number"]:focus {
     outline: 2px solid var(--accent);
@@ -242,7 +244,7 @@ const rateNote = boeRate.date
     gap: 0.5rem 1rem;
     padding: 1rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0;
     margin-bottom: 1.5rem;
   }
   .summary-label {
@@ -266,7 +268,7 @@ const rateNote = boeRate.date
     margin: -0.75rem 0 1.25rem;
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
-    border-radius: 6px;
+    border-radius: 0;
     background: color-mix(in srgb, var(--accent-warm) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--accent-warm) 40%, transparent);
     color: var(--text);
@@ -285,7 +287,7 @@ const rateNote = boeRate.date
     height: 360px;
     padding: 0.5rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0;
   }
   .chart-wrap figcaption {
     font-size: 0.85rem;
@@ -296,15 +298,16 @@ const rateNote = boeRate.date
 
   .how-it-works {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0;
     padding: 0.75rem 1rem;
   }
-  .how-it-works summary { cursor: pointer; font-weight: 600; }
+  .how-it-works summary { cursor: pointer; font-family: var(--font-ui); }
   .how-it-works p { margin: 0.75rem 0; }
   .how-it-works pre {
-    background: var(--border);
+    background: var(--panel);
+    border: 1px solid var(--border);
     padding: 0.75rem;
-    border-radius: 6px;
+    border-radius: 0;
     overflow-x: auto;
     font-family: var(--font-mono);
     font-size: 0.9rem;
@@ -360,7 +363,7 @@ const rateNote = boeRate.date
     return {
       text: s.getPropertyValue('--text').trim() || '#1a1a1a',
       muted: s.getPropertyValue('--muted').trim() || '#666',
-      border: s.getPropertyValue('--border').trim() || '#e5e5e5',
+      border: s.getPropertyValue('--grid').trim() || '#b8b8b8',
       accent: s.getPropertyValue('--accent').trim() || '#0070f3',
       warm: s.getPropertyValue('--accent-warm').trim() || '#ea580c',
       bg: s.getPropertyValue('--bg').trim() || '#fff',

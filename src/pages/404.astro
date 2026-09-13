@@ -1,7 +1,22 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import MacIcon from '../components/MacIcon.astro';
 ---
-<BaseLayout title="Page Not Found">
-  <h1>404 – Page Not Found</h1>
-  <p>Sorry, that page doesn't exist. <a href="/">Go home</a>.</p>
+<BaseLayout title="Page Not Found" windowTitle="System Error">
+  <div class="dialog">
+    <div class="dialog-inner">
+      <div class="dialog-body">
+        <MacIcon name="bomb" size={40} />
+        <div class="dialog-text">
+          <p>Sorry, a system error occurred.</p>
+          <p>&ldquo;that page&rdquo;</p>
+          <p>ID = 404</p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <span class="btn" aria-disabled="true">Resume</span>
+        <a href="/" class="btn btn-primary">Restart</a>
+      </div>
+    </div>
+  </div>
 </BaseLayout>

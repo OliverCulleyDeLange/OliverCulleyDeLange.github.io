@@ -1,27 +1,96 @@
-:root {
-  --bg: #ffffff;
-  --text: #1a1a1a;
-  --muted: #666666;
-  --accent: #0070f3;
-  --accent-warm: #ea580c;
-  --border: #e5e5e5;
-  --max-width: 720px;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+/* ═══════════════════════════════════════════════════════════════
+   oliverdelange.co.uk — Classic Mac OS (System 6/7) theme
+   UI/headings: ChiKareGo2 (Chicago 12pt recreation by Giles Booth, MIT).
+   Body: the real Geneva on macOS, Verdana/Tahoma elsewhere — readable.
+   Light and dark follow the system theme via --ink / --paper.
+   ═══════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: 'Chicago';
+  src: url('/fonts/ChiKareGo2.woff2') format('woff2'),
+       url('/fonts/ChiKareGo2.woff') format('woff');
+  font-display: swap;
 }
 
+:root {
+  color-scheme: light dark;
+
+  /* ── 1-bit system palette: ink on paper ── */
+  --ink: #000000;
+  --paper: #ffffff;
+  --grey: #6b6b6b;
+  --grey-light: #b0b0b0;
+
+  /* Surfaces */
+  --panel: #f2f2f2;
+  --panel-alt: #ececec;
+  --desktop: #b4b4b4;
+  --desktop-dot: #6e6e6e;
+  --grid: #b8b8b8;
+
+  /* ── Legacy names (still used by page-scoped styles) ── */
+  --bg: var(--paper);
+  --text: var(--ink);
+  --muted: var(--grey);
+  --accent: #0062a8;
+  --accent-warm: #d2620b;
+  --border: var(--ink);
+
+  --max-width: 760px;
+  --menubar-height: 22px;
+
+  --font-ui: 'Chicago', 'ChiKareGo2', Geneva, Verdana, sans-serif;
+  --font-body: Geneva, Verdana, Tahoma, 'DejaVu Sans', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+/* Dark tokens live in two places so an explicit choice can beat the system:
+   the media query handles "System", the attribute handles "Dark". */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-warm: #fb923c;
-    --border: #30363d;
+  :root:not([data-theme='light']) {
+    --ink: #e8e8e8;
+    --paper: #14171c;
+    --grey: #9aa1a9;
+    --grey-light: #464c54;
+
+    --panel: #1d2127;
+    --panel-alt: #262b32;
+    --desktop: #2b3038;
+    --desktop-dot: #171a1f;
+    --grid: #3a4049;
+
+    --accent: #6db3f2;
+    --accent-warm: #ffa552;
   }
 }
 
-* {
+:root[data-theme='dark'] {
+    --ink: #e8e8e8;
+    --paper: #14171c;
+    --grey: #9aa1a9;
+    --grey-light: #464c54;
+
+    --panel: #1d2127;
+    --panel-alt: #262b32;
+    --desktop: #2b3038;
+    --desktop-dot: #171a1f;
+    --grid: #3a4049;
+
+    --accent: #6db3f2;
+    --accent-warm: #ffa552;
+  }
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -29,443 +98,2009 @@
 
 html {
   font-size: 16px;
+  background: var(--desktop);
 }
 
+/* The desktop: authentic 50% dither pattern */
 body {
-  font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.7;
-  padding: 0 1rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background-color: var(--desktop);
+  background-image:
+    linear-gradient(45deg, var(--desktop-dot) 25%, transparent 25%, transparent 75%, var(--desktop-dot) 75%),
+    linear-gradient(45deg, var(--desktop-dot) 25%, transparent 25%, transparent 75%, var(--desktop-dot) 75%);
+  background-size: 2px 2px;
+  background-position: 0 0, 1px 1px;
+  background-attachment: fixed;
+  padding: calc(var(--menubar-height) + 1.25rem) 0.75rem 3rem;
+  min-height: 100vh;
 }
 
 a {
-  color: var(--accent);
-  text-decoration: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 a:hover {
-  text-decoration: underline;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
 }
 
-/* ── Header / Nav ── */
-header {
-  border-bottom: 1px solid var(--border);
-  padding: 1rem 0;
-  margin-bottom: 2rem;
+::selection {
+  background: var(--ink);
+  color: var(--paper);
 }
 
-nav {
-  max-width: var(--max-width);
-  margin: 0 auto;
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ═══ Menu bar ═══ */
+.menu-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--menubar-height);
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  z-index: 100;
+  user-select: none;
 }
 
-.site-title {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--text);
-}
-
-.nav-links {
+.menu-bar ul {
   display: flex;
-  gap: 1.5rem;
-}
-
-.nav-links a {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-/* ── Main ── */
-main {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding-bottom: 4rem;
-}
-
-/* ── Post list ── */
-.post-list .section-heading {
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.post-list ul {
+  align-items: stretch;
   list-style: none;
-}
-
-.post-list li {
-  border-bottom: 1px solid var(--border);
-  padding: 0.75rem 0;
-}
-
-.post-list a {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  color: var(--text);
-}
-
-.post-title {
-  font-size: 1rem;
-}
-
-.post-date {
-  font-size: 0.85rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* ── Post article ── */
-.post-header {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.post-header h1 {
-  font-size: 2rem;
-  line-height: 1.2;
-  margin-bottom: 0.5rem;
-}
-
-.post-meta {
-  font-size: 0.9rem;
-  color: var(--muted);
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.category {
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.tag {
-  background: var(--border);
-  color: var(--muted);
-  font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-}
-
-/* ── Post content typography ── */
-.post-content h1,
-.post-content h2,
-.post-content h3,
-.post-content h4 {
-  margin: 2rem 0 0.75rem;
-  line-height: 1.3;
-}
-
-.post-content p {
-  margin-bottom: 1.25rem;
-}
-
-.post-content img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  display: block;
-  margin: 1.5rem 0;
-}
-
-.post-content video {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 1.5rem 0;
-}
-
-.post-content pre {
-  background: var(--border);
-  padding: 1rem;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin-bottom: 1.25rem;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-}
-
-.post-content code {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  background: var(--border);
-  padding: 0.1em 0.3em;
-  border-radius: 3px;
-}
-
-.post-content pre code {
-  background: none;
+  margin: 0;
   padding: 0;
 }
 
-.post-content ul,
-.post-content ol {
-  margin-left: 1.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.post-content li {
-  margin-bottom: 0.25rem;
-}
-
-.post-content blockquote {
-  border-left: 4px solid var(--border);
-  padding-left: 1rem;
-  color: var(--muted);
-  margin: 1.5rem 0;
-}
-
-.post-content hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 2rem 0;
-}
-
-.post-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1.5rem 0;
-  font-size: 0.95rem;
-}
-
-.post-content table td,
-.post-content table th {
-  border: 1px solid var(--border);
-  padding: 0.5rem 0.75rem;
-  vertical-align: top;
-}
-
-.post-content table th {
-  background: var(--border);
-  font-weight: 600;
-  text-align: left;
-}
-
-.post-content table tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--border) 40%, transparent);
-}
-
-/* ── Footer ── */
-footer {
-  border-top: 1px solid var(--border);
-  padding: 1.5rem 0;
-  margin-top: 2rem;
-}
-
-footer p {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  text-align: center;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-
-footer a {
-  color: var(--muted);
-}
-
-/* ── Shared section heading ── */
-.section-heading {
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 1.25rem;
-}
-
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
+.menu-item {
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  transition: opacity 0.15s;
+  padding: 0 0.6rem;
+  cursor: default;
   white-space: nowrap;
 }
 
-.btn:hover {
-  opacity: 0.85;
+.menu-item > .menu-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  line-height: 1;
+}
+
+.menu-item:hover,
+.menu-item:focus-within {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.menu-bar a.menu-label {
+  text-decoration: none;
+  color: inherit;
+}
+
+.menu-bar a.menu-label:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.menu-item-logo {
+  padding: 0 0.55rem;
+}
+
+/* The disc follows currentColor; the letter must become whatever is behind it */
+.menu-item:hover .monogram,
+.menu-item:focus-within .monogram {
+  --knockout: var(--ink);
+}
+
+/* Drop-down menus */
+.menu-item > .menu-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 170px;
+  max-width: min(420px, calc(100vw - 0.5rem));
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  padding: 2px 0;
+  flex-direction: column;
+}
+
+.menu-item:hover > .menu-dropdown,
+.menu-item:focus-within > .menu-dropdown {
+  display: flex;
+}
+
+.menu-bar ul > .menu-item:last-child > .menu-dropdown {
+  left: auto;
+  right: 0;
+}
+
+.menu-dropdown li {
+  display: block;
+}
+
+.menu-dropdown li > a,
+.menu-dropdown li > button,
+.menu-dropdown li > .submenu-label {
+  display: block;
+  width: 100%;
+  padding: 3px 1.25rem;
+  background: none;
+  border: none;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: inherit;
+  cursor: default;
+}
+
+.menu-dropdown a:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.menu-dropdown .disabled {
+  color: var(--grey-light);
+}
+
+/* ── Hierarchical submenus ── */
+.menu-dropdown .has-submenu {
+  position: relative;
+}
+
+.menu-dropdown .has-submenu > .submenu-label {
+  padding-right: 2.1rem;
+  cursor: default;
+}
+
+.menu-dropdown .has-submenu > .submenu-label::after {
+  content: '';
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.menu-dropdown .has-submenu:hover > .submenu-label,
+.menu-dropdown .has-submenu:focus-within > .submenu-label {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.menu-dropdown .submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -3px;
+  z-index: 2;
+  min-width: 190px;
+  max-width: min(420px, calc(100vw - 1rem));
+  list-style: none;
+  margin: 0;
+  padding: 2px 0;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.menu-dropdown .has-submenu:hover > .submenu,
+.menu-dropdown .has-submenu:focus-within > .submenu {
+  display: block;
+}
+
+
+.menu-dropdown .divider {
+  border-top: 1px dotted var(--ink);
+  margin: 3px 0;
+  height: 0;
+}
+
+.menu-bar .menu-right {
+  margin-left: auto;
+}
+
+.menu-clock {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  cursor: default;
+}
+
+/* ═══ Windows ═══ */
+.window {
+  max-width: var(--max-width);
+  margin: 0 auto 1.5rem;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.window-wide {
+  max-width: 980px;
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 19px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--ink);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--ink) 0 1px,
+    var(--paper) 1px 3px
+  );
+  background-size: 100% 15px;
+  background-position: 0 2px;
+  background-repeat: no-repeat;
+  user-select: none;
+}
+
+.title-bar .title {
+  flex: 0 1 auto;
+  max-width: calc(100% - 5rem);
+  margin: 0 auto;
+  text-align: center;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  font-weight: normal;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--paper);
+  padding: 2px 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Close box / zoom box */
+.title-bar .box {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 0;
+  cursor: default;
+}
+
+.title-bar .box.zoom::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--ink);
+  border-right: none;
+  border-bottom: none;
+  margin: 0 0 0 0;
+}
+
+.window-body {
+  padding: 1.25rem 1.5rem;
+  background: var(--paper);
+}
+
+/* Finder-style status bar at the foot of a window */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--ink);
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.status-bar a {
   text-decoration: none;
 }
 
+.status-bar a:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ═══ Typography ═══ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
+  line-height: 1.2;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+h4, h5, h6 { font-size: 1rem; }
+
+/* Section heading = Finder group label */
+.section-heading {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 1rem;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+/* ═══ Buttons — classic Mac push buttons ═══ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  line-height: 1;
+  min-height: 22px;
+  padding: 0.3rem 0.9rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: none;
+}
+
+.btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.btn:active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The "default" button wears the extra ring */
 .btn-primary {
-  background: var(--accent);
-  color: #fff;
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink);
+  margin: 3px;
+}
+
+.btn-primary:active {
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .btn-ghost {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: var(--paper);
 }
 
 .btn-sm {
-  padding: 0.3rem 0.75rem;
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
+  padding: 0.2rem 0.7rem;
+  min-height: 19px;
+}
+
+.btn[aria-disabled='true'],
+.btn:disabled {
+  color: var(--grey-light);
+  border-color: var(--grey-light);
+  pointer-events: none;
 }
 
 .icon-link {
   display: inline-flex;
   align-items: center;
-  color: var(--muted);
-  padding: 0.3rem;
-  border-radius: 4px;
-  transition: color 0.15s;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink);
   text-decoration: none;
+  border: 1px solid transparent;
 }
 
 .icon-link:hover {
-  color: var(--text);
-  text-decoration: none;
+  background: var(--ink);
+  color: var(--paper);
 }
 
-/* ── Project cards (home page) ── */
+/* ═══ Home: Finder icon grid for projects ═══ */
 .projects-section {
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .project-cards {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1rem;
+  margin: 0;
+  padding: 0;
 }
 
 .project-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  transition: border-color 0.15s;
+  gap: 0.6rem;
+  border: 1px solid var(--ink);
+  padding: 0.75rem;
+  background: var(--paper);
 }
 
 .project-card:hover {
-  border-color: var(--accent);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.project-card-body {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.project-card-body .mac-icon {
+  flex: none;
+  margin-top: 2px;
 }
 
 .project-card-body h3 {
   font-size: 1rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .project-card-body h3 a {
-  color: var(--text);
+  text-decoration: none;
+}
+
+.project-card-body h3 a:hover {
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .project-card-body p {
+  font-family: var(--font-body);
   font-size: 0.875rem;
-  color: var(--muted);
   line-height: 1.5;
+  color: var(--ink);
 }
 
 .project-card-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
   margin-top: auto;
+  padding-top: 0.25rem;
 }
 
-/* ── Project page ── */
+/* ═══ Home: Finder list view for posts ═══ */
+.post-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ink);
+}
+
+.post-list .list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  border: 1px solid var(--ink);
+  border-bottom: none;
+  background: var(--paper);
+}
+
+.post-list .list-head span {
+  padding: 0.25rem 0.75rem;
+}
+
+.post-list .list-head span + span {
+  border-left: 1px solid var(--ink);
+}
+
+.post-list li + li {
+  border-top: 1px dotted var(--ink);
+}
+
+.post-list li a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.75rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.post-list li a:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.post-list li a:hover .mac-icon {
+  filter: invert(1);
+}
+
+.post-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.post-date {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* ═══ Post & project pages ═══ */
+.post-header,
 .project-page .project-header {
-  margin-bottom: 2rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--ink);
 }
 
+.post-header h1,
 .project-page .project-header h1 {
-  font-size: 2rem;
+  font-size: 1.75rem;
   line-height: 1.2;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  margin-bottom: 0.5rem;
+}
+
+.category {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tag {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .project-tagline {
-  font-size: 1.1rem;
-  color: var(--muted);
-  margin-bottom: 1rem;
+  font-size: 1rem;
+  margin-bottom: 0.9rem;
 }
 
 .project-links {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
   align-items: center;
 }
 
+/* ═══ Long-form content ═══ */
+.post-content,
 .project-body {
-  line-height: 1.75;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.65;
 }
 
-.project-body p {
-  margin-bottom: 1.25rem;
-}
-
+/* Bitmap fonts have no bold weight — the browser fakes it by smearing.
+   Promote emphasis to Chicago instead, which is how the Mac did it. */
+strong,
+b,
+th,
+.post-content strong,
 .project-body strong {
-  font-weight: 600;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
 }
 
+.post-content h1,
+.post-content h2,
+.post-content h3,
+.post-content h4,
+.project-body h2,
+.project-body h3 {
+  margin: 2rem 0 0.6rem;
+}
+
+.post-content h2,
+.project-body h2 {
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 0.2rem;
+}
+
+.post-content p,
+.project-body p {
+  margin-bottom: 1.1rem;
+}
+
+.post-content img,
+.project-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.5rem 0;
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.post-content video,
+.project-body video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.5rem 0;
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.post-content ul,
+.post-content ol,
+.project-body ul,
+.project-body ol {
+  margin: 0 0 1.1rem 1.5rem;
+}
+
+.post-content li,
+.project-body li {
+  margin-bottom: 0.2rem;
+}
+
+.post-content blockquote,
+.project-body blockquote {
+  border-left: 3px solid var(--ink);
+  padding: 0.25rem 0 0.25rem 1rem;
+  margin: 1.5rem 0;
+}
+
+.post-content hr {
+  border: none;
+  border-top: 1px dotted var(--ink);
+  margin: 2rem 0;
+}
+
+/* Code: keep a real monospace, dress the block as an inset panel */
+.post-content pre,
+.project-body pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.1rem;
+  overflow-x: auto;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--panel);
+  -webkit-font-smoothing: antialiased;
+}
+
+.post-content code,
+.project-body code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--panel-alt);
+  border: 1px solid var(--grey-light);
+  padding: 0 0.25em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.post-content pre code,
+.project-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Shiki renders its own dark theme — give it a window frame instead */
+.post-content pre.astro-code,
+.project-body pre.astro-code {
+  background: #0d1117 !important;
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.post-content table,
+.project-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  border: 1px solid var(--ink);
+}
+
+.post-content table td,
+.post-content table th,
+.project-body table td,
+.project-body table th {
+  border: 1px solid var(--ink);
+  padding: 0.35rem 0.6rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.post-content table th,
+.project-body table th {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-weight: normal;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--ink) 0 1px,
+    var(--paper) 1px 3px
+  );
+}
+
+.post-content table th > * {
+  background: var(--paper);
+}
+
+/* ═══ Related posts / dev log ═══ */
 .related-posts {
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--ink);
 }
 
 .related-posts h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 1rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 1rem;
+  font-weight: normal;
+  margin-bottom: 0.75rem;
 }
 
 .related-posts ul {
   list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ink);
 }
 
-.related-posts li {
+.related-posts li + li {
+  border-top: 1px dotted var(--ink);
+}
+
+.related-posts li a {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 1rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
+  padding: 0.3rem 0.65rem;
+  text-decoration: none;
+  font-size: 0.9375rem;
 }
 
-.related-posts li:last-child {
-  border-bottom: none;
+.related-posts li a:hover {
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .related-posts time {
-  color: var(--muted);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
   white-space: nowrap;
-  font-size: 0.8rem;
 }
 
-/* ── Post list section heading ── */
-.post-list .section-heading {
-  margin-top: 0;
+/* ═══ Icons ═══ */
+.mac-icon {
+  display: block;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+/* ═══ Alert / dialog boxes (404, errors) ═══ */
+.dialog {
+  max-width: min(460px, 100%);
+  margin: 2rem auto;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 6px;
+}
+
+.dialog-inner {
+  border: 1px solid var(--ink);
+  padding: 1.25rem;
+}
+
+.dialog-body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.dialog-text {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.dialog-text p + p {
+  margin-top: 0.5rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ═══ Boot screen ═══ */
+.boot-screen[hidden] {
+  display: none;
+}
+
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  cursor: pointer;
+}
+
+html.booting,
+html.booting body {
+  overflow: hidden;
+}
+
+.boot-mac {
+  image-rendering: pixelated;
+  width: 128px;
+  height: 154px;
+  animation: boot-pop 0.12s steps(2) 1;
+}
+
+.boot-caption {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 1rem;
+  text-align: center;
+  opacity: 0;
+  animation: boot-fade-in 0.01s steps(1) 0.75s forwards;
+}
+
+.boot-screen.leaving {
+  animation: boot-out 0.16s steps(2) forwards;
+}
+
+@keyframes boot-pop {
+  from { transform: scale(0.7); }
+  to { transform: scale(1); }
+}
+
+@keyframes boot-fade-in {
+  to { opacity: 1; }
+}
+
+@keyframes boot-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-mac,
+  .boot-caption,
+  .boot-screen.leaving {
+    animation: none;
+  }
+  .boot-caption { opacity: 1; }
+}
+
+/* ═══ Classic Mac scrollbars (WebKit) ═══ */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar {
+    width: 15px;
+    height: 15px;
+  }
+  ::-webkit-scrollbar-track {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(45deg, var(--ink) 25%, transparent 25%, transparent 75%, var(--ink) 75%),
+      linear-gradient(45deg, var(--ink) 25%, transparent 25%, transparent 75%, var(--ink) 75%);
+    background-size: 2px 2px;
+    background-position: 0 0, 1px 1px;
+    border-left: 1px solid var(--ink);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+  }
+  ::-webkit-scrollbar-corner {
+    background: var(--paper);
+  }
+}
+
+/* ═══ Responsive ═══ */
+@media (max-width: 640px) {
+  body {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .window {
+    margin-left: 0;
+    margin-right: 0;
+    box-shadow: none;
+    border-left: none;
+    border-right: none;
+  }
+  .window-body {
+    padding: 1rem;
+  }
+  .project-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Narrow: dropdowns hang off the screen edge, submenus expand inline
+   rather than flying out to the right where there is no room. */
+@media (max-width: 640px) {
+  .menu-item > .menu-dropdown,
+  .menu-bar ul > .menu-item:last-child > .menu-dropdown {
+    position: fixed;
+    top: var(--menubar-height);
+    left: 4px;
+    right: auto;
+    max-width: calc(100vw - 8px);
+    max-height: calc(100vh - var(--menubar-height) - 8px);
+    overflow-y: auto;
+  }
+  .menu-dropdown .submenu {
+    position: static;
+    display: block;
+    min-width: 0;
+    max-width: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+  .menu-dropdown .submenu a {
+    padding-left: 2.5rem;
+  }
+  .menu-dropdown .has-submenu > .submenu-label {
+    padding-right: 1.25rem;
+  }
+  .menu-dropdown .has-submenu > .submenu-label::after {
+    display: none;
+  }
+}
+
+/* The menu bar shrinks to fit rather than dropping menus */
+@media (max-width: 560px) {
+  .menu-item {
+    padding: 0 0.45rem;
+  }
+  .menu-clock {
+    padding: 0 0.5rem;
+    gap: 0.4rem;
+  }
+  .menu-date {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .menu-bar {
+    font-size: 0.8125rem;
+  }
+  .menu-item {
+    padding: 0 0.32rem;
+  }
+  .menu-clock {
+    font-size: 0.8125rem;
+    padding: 0 0.4rem;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Desktop shell — icons, windows, dock.
+   Only ever visible once desktop.js mounts; without JS the plain
+   server-rendered page is what you get.
+   ═══════════════════════════════════════════════════════════════ */
+
+html.desktop-boot main {
+  visibility: hidden;
+}
+
+html.desktop-on,
+html.desktop-on body {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.desktop-on body {
+  padding: 0;
+}
+
+.desktop[hidden],
+.dock[hidden] {
+  display: none;
+}
+
+.desktop {
+  position: fixed;
+  inset: var(--menubar-height) 0 0 0;
+  overflow: hidden;
+}
+
+/* ── Desktop icons ── */
+.desk-icons {
+  position: absolute;
+  inset: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.desk-icon[hidden] {
+  display: none;
+}
+
+.desk-icon {
+  position: absolute;
+  width: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.2rem;
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+  text-align: center;
+}
+
+.desk-icon .desk-label {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  line-height: 1.1;
+  padding: 1px 4px;
+  background: var(--paper);
+  color: var(--ink);
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.desk-icon:hover .desk-label,
+.desk-icon:focus-visible .desk-label {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.desk-icon:focus-visible {
+  outline: 1px dotted var(--paper);
+  outline-offset: 2px;
+}
+
+.desk-icon.is-dragging {
+  opacity: 0.65;
+  z-index: 5;
+}
+
+/* ── Windows ── */
+.win-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.win {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  min-height: 120px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.win[hidden] {
+  display: none;
+}
+
+.win-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  height: 19px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--ink);
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+.win.is-active .win-bar {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--ink) 0 1px,
+    var(--paper) 1px 3px
+  );
+  background-size: 100% 15px;
+  background-position: 0 2px;
+  background-repeat: no-repeat;
+}
+
+.win-title {
+  flex: 0 1 auto;
+  margin: 0 auto;
+  max-width: calc(100% - 6rem);
+  padding: 2px 0.5rem;
+  background: var(--paper);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.win:not(.is-active) .win-title {
+  color: var(--grey);
+}
+
+.win-lights {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 54px;
+  padding-left: 2px;
+}
+
+.win-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 54px;
+  padding-right: 2px;
+}
+
+.win-open[hidden] {
+  display: none;
+}
+
+.win-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  cursor: default;
+}
+
+.win-open:hover,
+.win-open:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+/* greyed on inactive windows, matching the traffic lights */
+.win:not(.is-active) .win-open {
+  color: var(--grey-light);
+  border-color: var(--grey-light);
+}
+
+.win-bar .light {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  background: #d3d3d6;
+  cursor: default;
+}
+
+.win.is-active .win-bar .light.close { background: #ff5f57; }
+.win.is-active .win-bar .light.min   { background: #febc2e; }
+.win.is-active .win-bar .light.zoom  { background: #28c840; }
+
+.win-bar .light:active {
+  filter: brightness(0.82);
+}
+
+/* macOS only reveals the glyphs when you are over the cluster */
+.win-lights:hover .light::after,
+.win-lights:focus-within .light::after {
+  opacity: 1;
+}
+
+.win-bar .light::after {
+  content: '';
+  display: block;
+  opacity: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.win-bar .light.close::after {
+  background-image: linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor);
+  background-size: 6px 1px, 1px 6px;
+  color: rgba(0, 0, 0, 0.6);
+  transform: rotate(45deg);
+}
+
+.win-bar .light.min::after {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 6px 1px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.win-bar .light.zoom::after {
+  background-image: linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor);
+  background-size: 6px 1px, 1px 6px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.win-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+  background: var(--paper);
+}
+
+.win-body.is-frame {
+  padding: 0;
+  overflow: hidden;
+}
+
+.win-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--paper);
+}
+
+.win-loading {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  color: var(--grey);
+  padding: 1rem 0;
+}
+
+.win-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  background: var(--paper);
+  border: none;
+  border-top: 1px solid var(--ink);
+  border-left: 1px solid var(--ink);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.win-grip::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.win.is-max .win-grip {
+  display: none;
+}
+
+/* Folder / trash listings reuse the Finder list look */
+.folder-list .list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  border: 1px solid var(--ink);
+  border-bottom: none;
+  background: var(--paper);
+}
+
+.folder-list .list-head span {
+  padding: 0.25rem 0.75rem;
+}
+
+.folder-list .list-head span + span {
+  border-left: 1px solid var(--ink);
+}
+
+.folder-list .post-title {
+  font-size: 0.9375rem;
+}
+
+.folder-list ul,
+.trash-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ink);
+}
+
+.folder-list li + li,
+.trash-list li + li {
+  border-top: 1px dotted var(--ink);
+}
+
+.folder-list li a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.65rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.folder-list li a:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.folder-list li a:hover .mac-icon {
+  filter: invert(1);
+}
+
+.trash-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.35rem 0.65rem;
+}
+
+/* ── Dock ── */
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  max-width: calc(100vw - 16px);
+  padding: 6px 8px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* the global dither scrollbar is far too tall to sit inside the dock */
+.dock::-webkit-scrollbar {
+  height: 4px;
+  width: auto;
+}
+
+.dock::-webkit-scrollbar-track {
+  background: none;
+  border: none;
+}
+
+.dock::-webkit-scrollbar-thumb {
+  background: var(--grey-light);
+  border: none;
+}
+
+.dock-items {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.dock-sep {
+  flex: none;
+  width: 1px;
+  align-self: stretch;
+  background: var(--ink);
+}
+
+.dock:not(.has-items) .dock-items,
+.dock:not(.has-items) .dock-sep-min {
+  display: none;
+}
+
+.dock-browser .mac-icon {
+  opacity: 0.55;
+}
+
+.dock-browser.is-live .mac-icon {
+  opacity: 1;
+}
+
+/* the running-app dot, like the real dock */
+.dock-browser.is-live::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+}
+
+.dock-browser {
+  position: relative;
+}
+
+.dock-item {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 68px;
+  padding: 4px 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink);
+  cursor: default;
+  font: inherit;
+}
+
+.dock-item:hover,
+.dock-item:focus-visible {
+  border-color: var(--ink);
+}
+
+.dock-label {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.6875rem;
+  line-height: 1.1;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-win.is-min .mac-icon {
+  opacity: 0.5;
+}
+
+.dock-win.is-active {
+  border-color: var(--ink);
+  background: var(--panel);
+}
+
+/* running dot, same idea as the browser tile */
+.dock-win {
+  position: relative;
+}
+
+.dock-win.is-live::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+}
+
+.dock-trash.is-full .mac-icon {
+  transform: rotate(-8deg);
+}
+
+.dock-trash.is-target {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .desk-icon {
+    width: 76px;
+  }
+  .dock {
+    bottom: 4px;
+    gap: 0.35rem;
+    padding: 4px 6px;
+  }
+  .dock-item {
+    width: 54px;
+  }
+  .dock-items {
+    gap: 0.3rem;
+  }
+}
+
+/* One of our own pages loaded into an app window: strip the shell so it
+   reads as an application rather than a page inside a page. */
+html.is-framed .menu-bar,
+html.is-framed .title-bar,
+html.is-framed .status-bar,
+html.is-framed .dock,
+html.is-framed .desktop {
+  display: none !important;
+}
+
+html.is-framed body {
+  padding: 0;
+  background: var(--paper);
+}
+
+html.is-framed .window {
+  max-width: none;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+}
+
+html.is-framed .window-body {
+  padding: 1rem 1.25rem;
+}
+
+
+/* ── Desktop context menu ── */
+.context-menu[hidden] {
+  display: none;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 170px;
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 3px 1.25rem;
+  background: none;
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+  cursor: default;
+}
+
+.context-menu button:hover,
+.context-menu button:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+/* ── Menu items that are buttons (Apple menu actions) ── */
+.menu-dropdown button:hover,
+.menu-dropdown button:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+/* ── Keyboard-shortcut hint, right-aligned like classic Mac ──
+   Only items that carry a .menu-shortcut become a flex row; leaves
+   the plain items (About, Lock Screen, submenu labels) untouched. */
+.menu-dropdown a:has(.menu-shortcut),
+.menu-dropdown button:has(.menu-shortcut) {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.menu-dropdown li > a > span:not(.menu-shortcut),
+.menu-dropdown li > button > span:not(.menu-shortcut) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-shortcut {
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  color: var(--grey);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+.menu-dropdown a:hover .menu-shortcut,
+.menu-dropdown button:hover .menu-shortcut,
+.menu-dropdown button:focus-visible .menu-shortcut {
+  color: var(--paper);
+}
+
+/* ── Toast: the little "Link copied" pill ── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 5.5rem;
+  transform: translate(-50%, 4px);
+  z-index: 9000;
+  padding: 0.35rem 0.9rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  font: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease-out, transform 140ms ease-out;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ── About window ── */
+.about-pane h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.about-tagline {
+  color: var(--grey);
+  margin-bottom: 1rem;
+}
+
+.about-spec {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.9rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.about-spec dt {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.about-foot {
+  border-top: 1px solid var(--ink);
+  padding-top: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+/* ── Settings window ── */
+.settings-heading {
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+}
+
+.settings-hint {
+  color: var(--grey);
+  font-size: 0.9375rem;
+  margin-bottom: 1rem;
+}
+
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9375rem;
+  cursor: default;
+}
+
+.settings-row input {
+  accent-color: var(--ink);
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Lock screen ── */
+.lock-screen[hidden],
+.lock-dialog[hidden] {
+  display: none;
+}
+
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background-color: var(--desktop);
+  background-image:
+    linear-gradient(45deg, var(--desktop-dot) 25%, transparent 25%, transparent 75%, var(--desktop-dot) 75%),
+    linear-gradient(45deg, var(--desktop-dot) 25%, transparent 25%, transparent 75%, var(--desktop-dot) 75%);
+  background-size: 2px 2px;
+  background-position: 0 0, 1px 1px;
+}
+
+html.is-locked,
+html.is-locked body {
+  overflow: hidden;
+}
+
+.lock-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.75rem 2rem;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  max-width: calc(100vw - 2rem);
+}
+
+.lock-name {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 1rem;
+}
+
+.lock-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.lock-form input {
+  width: 190px;
+  max-width: 46vw;
+  padding: 0.3rem 0.5rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+}
+
+.lock-form input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.lock-error {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  color: var(--apple-red, #e03a3e);
+}
+
+.lock-forgot {
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
+.lock-forgot:hover {
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.lock-dialog {
+  margin: 0;
+}
+
+.lock-dialog .dialog-text p:first-child {
+  font-size: 1.25rem;
+}
+
+.lock-dialog-note {
+  color: var(--grey);
+  font-size: 0.8125rem;
+}
+
+.lock-inner.shake {
+  animation: lock-shake 0.28s steps(3) 1;
+}
+
+@keyframes lock-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lock-inner.shake { animation: none; }
+}
+
+
+/* On touch, the macOS-sized lights are far too small to hit reliably. */
+@media (pointer: coarse) {
+  .win-bar {
+    height: 28px;
+    gap: 0.5rem;
+  }
+
+  .win-lights {
+    width: 84px;
+    gap: 10px;
+    padding-left: 4px;
+  }
+
+  .win-actions {
+    width: 84px;
+    padding-right: 4px;
+  }
+
+  .win-bar .light {
+    width: 20px;
+    height: 20px;
+  }
+
+  .win-open {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* glyphs are always visible: there is no hover to reveal them */
+  .win-bar .light::after {
+    opacity: 1;
+  }
+
+  .win-grip {
+    width: 22px;
+    height: 22px;
+  }
+
+  .dock-item {
+    width: 64px;
+    padding: 6px 2px;
+  }
+}
+
+/* ── Dock hint dialog ── */
+.dock-hint[hidden] {
+  display: none;
+}
+
+.dock-hint {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 300;
+  margin: 0;
+}
+
+/* Long-press must not select the label or trigger double-tap zoom. */
+.dock-item {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
