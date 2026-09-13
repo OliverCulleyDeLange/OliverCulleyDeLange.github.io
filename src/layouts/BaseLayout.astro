@@ -83,9 +83,17 @@ const desktopData = {
   })),
 };
 
+/* Social shortcuts that live top-right on the desktop, so a phone visitor
+   can jump straight to them without opening a menu. */
+const socialIcons = [
+  { id: 'github', name: 'GitHub', icon: 'github', href: 'https://github.com/OliverCulleyDeLange' },
+  { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin', href: 'https://www.linkedin.com/in/oliverdelange' },
+];
+
 /* Every glyph the script may need to clone at runtime. */
 const iconNames = [...new Set([
   ...deskIcons.map(i => i.icon), 'app', 'doc', 'folder', 'monogram',
+  ...socialIcons.map(i => i.icon),
 ])];
 ---
 <!DOCTYPE html>
@@ -249,6 +257,13 @@ const iconNames = [...new Set([
           <MacIcon name="folder" size={32} />
           <span class="desk-label">Blog</span>
         </li>
+        {socialIcons.map(item => (
+          <li class="desk-icon" data-id={item.id} data-href={item.href} data-corner="tr"
+              tabindex="0" role="link" aria-label={`Open ${item.name}`}>
+            <MacIcon name={item.icon as any} size={32} />
+            <span class="desk-label">{item.name}</span>
+          </li>
+        ))}
       </ul>
       <div class="win-layer" id="win-layer"></div>
     </div>

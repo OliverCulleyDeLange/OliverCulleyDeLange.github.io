@@ -493,6 +493,8 @@ function openTrash() {
 
 function iconMeta(id) {
   if (id === 'blog') return { id: 'blog', name: 'Blog', icon: 'folder' };
+  if (id === 'github') return { id: 'github', name: 'GitHub', icon: 'github' };
+  if (id === 'linkedin') return { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin' };
   const p = data.projects.find(x => x.id === id);
   return p ? { id: p.id, name: p.name, icon: p.icon } : null;
 }
@@ -518,22 +520,40 @@ function applyTrash() {
 
 function layoutIcons() {
   const saved = store.read('odl-icons', {});
-  const { w } = deskRect();
+  const { w, h } = deskRect();
   const colW = 104, rowH = 92, pad = 12;
-  const perCol = Math.max(1, Math.floor((desktop.clientHeight - pad) / rowH));
-  let i = 0;
-  iconLayer.querySelectorAll('.desk-icon').forEach(el => {
+  const perCol = Math.max(1, Math.floor((h - pad) / rowH));
+
+  // Flow icons fill columns from the top-left; corner="tr" pins stack
+  // down from the top-right so socials stay reachable on a phone.
+  const all = [...iconLayer.querySelectorAll('.desk-icon')];
+  const flow = all.filter(el => el.dataset.corner !== 'tr');
+  const trPins = all.filter(el => el.dataset.corner === 'tr');
+
+  flow.forEach((el, i) => {
     const id = el.dataset.id;
     const pos = saved[id];
     if (pos) {
       el.style.left = clamp(pos.x, 0, Math.max(0, w - colW)) + 'px';
-      el.style.top = clamp(pos.y, 0, Math.max(0, desktop.clientHeight - rowH)) + 'px';
+      el.style.top = clamp(pos.y, 0, Math.max(0, h - rowH)) + 'px';
     } else {
       const col = Math.floor(i / perCol), row = i % perCol;
       el.style.left = (pad + col * colW) + 'px';
       el.style.top = (pad + row * rowH) + 'px';
     }
-    i++;
+  });
+
+  const iconW = el => el.offsetWidth || colW;
+  trPins.forEach((el, i) => {
+    const id = el.dataset.id;
+    const pos = saved[id];
+    if (pos) {
+      el.style.left = clamp(pos.x, 0, Math.max(0, w - iconW(el))) + 'px';
+      el.style.top = clamp(pos.y, 0, Math.max(0, h - rowH)) + 'px';
+    } else {
+      el.style.left = Math.max(0, w - iconW(el) - pad) + 'px';
+      el.style.top = (pad + i * rowH) + 'px';
+    }
   });
 }
 
@@ -549,6 +569,11 @@ function persistIcons() {
 }
 
 function activateIcon(el) {
+  const href = el.dataset.href;
+  if (href) {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    return;
+  }
   const id = el.dataset.id;
   if (id === 'blog') return openBlogFolder();
   const project = data.projects.find(p => p.id === id);

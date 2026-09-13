@@ -4,6 +4,8 @@
 interface Props {
   name:
     | 'doc' | 'app' | 'folder' | 'monogram' | 'happymac' | 'bomb'
+    /* Social icons — pinned top-right on the desktop. */
+    | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'memory'
     | 'scribbles' | 'location-alarm' | 'climb';
@@ -204,6 +206,51 @@ const letterO: [number, number, number][] = [
           fill="currentColor"/>
     <path d="M8.147,1.538L4.279,6.189A2,2 88.569,0 0,4.538 9.006L4.774,9.202A2,2 84.22,0 0,7.59 8.943L11.459,4.292A2,2 88.569,0 0,11.2 1.475L10.964,1.279A2,2 88.569,0 0,8.147 1.538z"
           fill="currentColor"/>
+  </svg>
+)}
+{name === 'github' && (
+  /* Octocat silhouette — solid pixel head with two knocked-out eyes
+     and a splayed set of tentacle feet below. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <g fill="currentColor">
+      {/* Head — rounded top */}
+      <rect x="4" y="1" width="8" height="1"/>
+      <rect x="3" y="2" width="10" height="1"/>
+      <rect x="2" y="3" width="12" height="1"/>
+      <rect x="1" y="4" width="14" height="1"/>
+      <rect x="1" y="5" width="14" height="2"/>
+      <rect x="1" y="7" width="14" height="3"/>
+      <rect x="2" y="10" width="12" height="1"/>
+      <rect x="3" y="11" width="10" height="1"/>
+      {/* Tentacle feet */}
+      <rect x="4" y="12" width="3" height="1"/>
+      <rect x="9" y="12" width="3" height="1"/>
+      <rect x="4" y="13" width="1" height="1"/>
+      <rect x="6" y="13" width="1" height="1"/>
+      <rect x="9" y="13" width="1" height="1"/>
+      <rect x="11" y="13" width="1" height="1"/>
+    </g>
+    <g fill="var(--paper)">
+      {/* Eyes */}
+      <rect x="3" y="5" width="2" height="2"/>
+      <rect x="11" y="5" width="2" height="2"/>
+    </g>
+  </svg>
+)}
+{name === 'linkedin' && (
+  /* Filled square badge with a lowercase "in" carved out in paper,
+     the way the real mark reads on a screen full of tiles. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <rect x="0" y="0" width="16" height="16" fill="currentColor"/>
+    <g fill="var(--paper)">
+      {/* i — dot then shaft */}
+      <rect x="3" y="3" width="2" height="2"/>
+      <rect x="3" y="7" width="2" height="6"/>
+      {/* n — top bar with two legs */}
+      <rect x="7" y="7" width="6" height="2"/>
+      <rect x="7" y="9" width="2" height="4"/>
+      <rect x="11" y="9" width="2" height="4"/>
+    </g>
   </svg>
 )}
 {name === 'climb' && (
