@@ -8,7 +8,7 @@ interface Props {
     | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'memory'
-    | 'scribbles' | 'location-alarm' | 'climb';
+    | 'scribbles' | 'location-alarm' | 'climb' | 'map';
   size?: number;
   class?: string;
 }
@@ -273,5 +273,15 @@ const letterO: [number, number, number][] = [
     <path d="M7.5 6 L8.5 5 L9.5 6 L10.5 5 L11.5 6 L10 2 Z" fill="var(--paper)"/>
     {/* Front peak — paper with outline, in front of rear */}
     <path d="M0 14 L5 7 L11 14 Z" fill="var(--paper)" stroke="currentColor" stroke-width="1" stroke-linejoin="miter"/>
+  </svg>
+)}
+{name === 'map' && (
+  /* Folded map — three panels and a pin, keeping the small desktop glyph
+     legible at Finder-icon scale. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M1 3.5 5.75 2l4.5 1.5L15 2v10.5L10.25 14l-4.5-1.5L1 14z" fill="var(--paper)" stroke="currentColor" stroke-width="1" stroke-linejoin="miter"/>
+    <path d="M5.75 2v10.5M10.25 3.5V14" fill="none" stroke="currentColor" stroke-width="1"/>
+    <path d="M8 4.5a2 2 0 0 0-2 2c0 1.5 2 3.5 2 3.5s2-2 2-3.5a2 2 0 0 0-2-2Z" fill="currentColor"/>
+    <rect x="7.5" y="6" width="1" height="1" fill="var(--paper)"/>
   </svg>
 )}

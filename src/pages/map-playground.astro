@@ -1,0 +1,527 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Map Playground" description="An interactive OpenFreeMap and MapLibre map" windowTitle="Map Playground" wide>
+  <section class="map-playground" aria-label="Map Playground">
+    <div id="map" class="map-canvas" aria-label="Interactive map of London"></div>
+    <div class="map-overlay">
+      <label class="map-style-label" for="map-style">Style
+        <select id="map-style" aria-label="Map style">
+          <option value="liberty">Liberty</option>
+          <option value="positron">Positron</option>
+          <option value="bright">Bright</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <button class="btn btn-sm" id="map-locate" type="button">Find me</button>
+      <output id="map-coordinates" class="map-coordinates" aria-live="polite">51.5074° N, 0.1278° W</output>
+    </div>
+    <aside class="map-toggles-panel" aria-labelledby="map-toggles-title">
+      <div class="map-toggles-heading">
+        <h2 id="map-toggles-title">Layers</h2>
+        <div class="map-toggles-heading-actions">
+          <button id="map-toggles-reset" class="map-toggle-reset" type="button">Reset</button>
+          <output id="map-toggles-count" class="map-toggles-count" aria-live="polite"></output>
+        </div>
+      </div>
+      <div id="map-toggles-list" class="map-toggles-list" aria-label="Map layers"></div>
+    </aside>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  @import url('https://unpkg.com/maplibre-gl@^6.9.0/dist/maplibre-gl.css');
+
+  .map-playground {
+    position: relative;
+    height: 100%;
+    min-height: 100%;
+  }
+
+  .map-overlay {
+    position: absolute;
+    z-index: 2;
+    top: 0.75rem;
+    left: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    max-width: calc(100% - 1.5rem);
+    padding: 0.35rem 0.45rem;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    border: 1px solid var(--ink);
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+  }
+
+  .map-style-label { display: flex; align-items: center; gap: 0.35rem; }
+
+  .map-style-label select {
+    min-height: 25px;
+    padding: 0 0.35rem;
+    color: var(--ink);
+    font: inherit;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+  }
+
+  .map-coordinates { font-variant-numeric: tabular-nums; }
+
+  .map-canvas {
+    position: absolute;
+    inset: 0;
+    background: #dce7e8;
+  }
+
+  .map-toggles-panel {
+    position: absolute;
+    z-index: 2;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    width: min(17rem, calc(100% - 1.5rem));
+    max-height: min(34rem, calc(100% - 1.5rem));
+    overflow: hidden;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    border: 1px solid var(--ink);
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+  }
+
+  .map-toggles-heading {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  .map-toggles-panel h2 { margin: 0; font: inherit; font-weight: 700; }
+
+  .map-toggles-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 0.55rem; }
+  .map-toggles-count { color: color-mix(in srgb, var(--ink) 65%, transparent); }
+
+  .map-toggle-reset {
+    font: inherit;
+    padding: 0.1rem 0.4rem;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    cursor: pointer;
+  }
+
+  .map-toggle-reset:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+  .map-toggles-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .map-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.34rem 0.55rem;
+    border-bottom: 1px dotted color-mix(in srgb, var(--ink) 28%, transparent);
+  }
+
+  .map-toggle-row:last-child { border-bottom: 0; }
+  .map-toggle-row:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+  .map-toggle-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font: inherit;
+  }
+
+  .map-toggle-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 0.25rem; }
+
+  .map-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+
+  .map-toggle-btn:hover { border-color: var(--ink); }
+  .map-toggle-btn svg { width: 14px; height: 14px; }
+
+  .map-toggle-btn.is-off { color: color-mix(in srgb, var(--ink) 45%, transparent); }
+
+  .map-toggle-btn.map-toggle-highlight.is-active {
+    color: #ff2f92;
+    border-color: #ff2f92;
+  }
+
+  .map-toggle-btn:disabled {
+    color: color-mix(in srgb, var(--ink) 30%, transparent);
+    cursor: not-allowed;
+  }
+
+  .map-toggle-group { border-bottom: 1px dotted color-mix(in srgb, var(--ink) 28%, transparent); }
+  .map-toggle-group:last-child { border-bottom: 0; }
+
+  .map-toggle-group > summary {
+    padding: 0.34rem 0.55rem;
+    color: var(--ink);
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .map-toggle-group-line { display: inline-flex; align-items: center; gap: 0.5rem; width: calc(100% - 1.1rem); }
+
+  .map-toggle-group > summary:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .map-toggle-group[open] > summary { border-bottom: 1px dotted color-mix(in srgb, var(--ink) 20%, transparent); }
+
+  .map-toggle-children {
+    margin-left: 0.85rem;
+    padding-left: 0.55rem;
+    border-left: 1px dotted color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+
+  .map-toggle-children > .map-toggle-row:last-child,
+  .map-toggle-children > .map-toggle-group:last-child { border-bottom: 0; }
+
+  .maplibregl-ctrl-group { border-radius: 0; box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35); }
+  .maplibregl-ctrl-group button { border-radius: 0; }
+
+  body.standalone-page:has(.map-playground) { overflow: hidden; }
+  .standalone-page main:has(.map-playground),
+  .standalone-page .window:has(.map-playground),
+  .standalone-page .window-body:has(.map-playground) {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  html.is-framed,
+  html.is-framed body,
+  html.is-framed main,
+  html.is-framed .window,
+  html.is-framed .window-body { height: 100%; }
+  html.is-framed .window-body { box-sizing: border-box; }
+  html.is-framed .map-playground { height: 100%; min-height: 0; }
+  html.is-framed .map-canvas { min-height: 0; }
+
+  @media (max-width: 520px) {
+    .map-overlay { gap: 0.4rem; }
+    .map-coordinates { width: 100%; }
+    .map-toggles-panel { top: auto; bottom: 0.75rem; max-height: 42%; }
+  }
+</style>
+
+<script is:inline type="module">
+  import * as maplibregl from 'https://unpkg.com/maplibre-gl@^6.9.0/dist/maplibre-gl.mjs';
+
+  const styles = {
+    liberty: 'https://tiles.openfreemap.org/styles/liberty',
+    positron: 'https://tiles.openfreemap.org/styles/positron',
+    bright: 'https://tiles.openfreemap.org/styles/bright',
+    dark: 'https://tiles.openfreemap.org/styles/dark',
+  };
+  const coordinateOutput = document.querySelector('#map-coordinates');
+  const styleSelect = document.querySelector('#map-style');
+  const locateButton = document.querySelector('#map-locate');
+  const layerList = document.querySelector('#map-toggles-list');
+  const layerCount = document.querySelector('#map-toggles-count');
+  const layerVisibility = new Map();
+  const highlightedLayers = new Set();
+  const resetButton = document.querySelector('#map-toggles-reset');
+  let allLayers = [];
+  let rowEntries = [];
+  let groupEntries = [];
+
+  const HIGHLIGHT_COLOR = '#ff2f92';
+  const HIGHLIGHT_SUFFIX = '__highlight';
+  const UNHIGHLIGHTABLE_TYPES = new Set(['background', 'raster', 'raster-particle', 'hillshade', 'sky']);
+
+  const EYE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.8 21.8 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.8 21.8 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+  const HIGHLIGHT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/></svg>';
+
+  const buildHighlightLayer = layer => {
+    const base = { id: layer.id + HIGHLIGHT_SUFFIX, source: layer.source };
+    if (layer['source-layer']) base['source-layer'] = layer['source-layer'];
+    if (layer.filter) base.filter = layer.filter;
+    if (layer.type === 'circle' || layer.type === 'symbol') {
+      return { ...base, type: 'circle', paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': HIGHLIGHT_COLOR, 'circle-stroke-width': 3 } };
+    }
+    return { ...base, type: 'line', paint: { 'line-color': HIGHLIGHT_COLOR, 'line-width': 3, 'line-opacity': 0.95 } };
+  };
+
+  const setHighlighted = (layer, on) => {
+    const highlightId = layer.id + HIGHLIGHT_SUFFIX;
+    if (on) {
+      highlightedLayers.add(layer.id);
+      if (!map.getLayer(highlightId)) map.addLayer(buildHighlightLayer(layer));
+    } else {
+      highlightedLayers.delete(layer.id);
+      if (map.getLayer(highlightId)) map.removeLayer(highlightId);
+    }
+  };
+
+  const formatCoordinates = ({ lng, lat }) => {
+    const latitude = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}`;
+    const longitude = `${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? 'E' : 'W'}`;
+    return `${latitude}, ${longitude}`;
+  };
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: styles.liberty,
+    center: [-0.1278, 51.5074],
+    zoom: 10.5,
+    attributionControl: true,
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-left');
+  map.on('move', () => { coordinateOutput.value = coordinateOutput.textContent = formatCoordinates(map.getCenter()); });
+
+  // Layer ids are underscore-delimited (e.g. "tunnel_motorway_link_casing"), so group them
+  // into a tree by splitting on "_" — each segment becomes an expandable node.
+  const buildLayerTree = layers => {
+    const root = { children: new Map(), layer: null };
+    for (const layer of layers) {
+      let node = root;
+      for (const part of layer.id.split('_')) {
+        if (!node.children.has(part)) node.children.set(part, { children: new Map(), layer: null });
+        node = node.children.get(part);
+      }
+      node.layer = layer;
+    }
+    return root;
+  };
+
+  const collectLeaves = node => {
+    const leaves = node.layer ? [node.layer] : [];
+    for (const child of node.children.values()) leaves.push(...collectLeaves(child));
+    return leaves;
+  };
+
+  // Re-reads layerVisibility/highlightedLayers and repaints every row's and group's
+  // eye/highlight buttons to match — called after any single or bulk toggle.
+  const syncAllControls = () => {
+    for (const entry of rowEntries) { entry.updateEye(); entry.updateHighlight(); }
+    for (const entry of groupEntries) entry.update();
+  };
+
+  const createLayerRow = (layer, label) => {
+    const visible = layerVisibility.get(layer.id) ?? layer.layout?.visibility !== 'none';
+    layerVisibility.set(layer.id, visible);
+    map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
+
+    const row = document.createElement('div');
+    row.className = 'map-toggle-row';
+
+    const name = document.createElement('code');
+    name.className = 'map-toggle-name';
+    name.textContent = label;
+    name.title = layer.id;
+
+    const actions = document.createElement('div');
+    actions.className = 'map-toggle-actions';
+
+    const canHighlight = !UNHIGHLIGHTABLE_TYPES.has(layer.type);
+    const highlightBtn = document.createElement('button');
+    highlightBtn.type = 'button';
+    highlightBtn.className = 'map-toggle-btn map-toggle-highlight';
+    highlightBtn.innerHTML = HIGHLIGHT_ICON;
+    highlightBtn.disabled = !canHighlight;
+    if (!canHighlight) highlightBtn.title = 'Not available for this layer type';
+    highlightBtn.addEventListener('click', () => {
+      setHighlighted(layer, !highlightedLayers.has(layer.id));
+      syncAllControls();
+    });
+
+    const eyeBtn = document.createElement('button');
+    eyeBtn.type = 'button';
+    eyeBtn.className = 'map-toggle-btn map-toggle-eye';
+    eyeBtn.addEventListener('click', () => {
+      const shown = !(layerVisibility.get(layer.id) ?? true);
+      layerVisibility.set(layer.id, shown);
+      map.setLayoutProperty(layer.id, 'visibility', shown ? 'visible' : 'none');
+      syncAllControls();
+    });
+
+    actions.append(highlightBtn, eyeBtn);
+    row.append(name, actions);
+
+    rowEntries.push({
+      updateEye: () => {
+        const shown = layerVisibility.get(layer.id) ?? true;
+        eyeBtn.innerHTML = shown ? EYE_ICON : EYE_OFF_ICON;
+        eyeBtn.classList.toggle('is-off', !shown);
+        eyeBtn.setAttribute('aria-pressed', String(shown));
+        eyeBtn.setAttribute('aria-label', `${shown ? 'Hide' : 'Show'} ${layer.id}`);
+      },
+      updateHighlight: () => {
+        const on = highlightedLayers.has(layer.id);
+        highlightBtn.classList.toggle('is-active', on);
+        highlightBtn.setAttribute('aria-pressed', String(on));
+        highlightBtn.setAttribute('aria-label', canHighlight ? `${on ? 'Clear highlight for' : 'Highlight'} ${layer.id}` : `Highlighting unavailable for ${layer.id}`);
+      },
+    });
+
+    return row;
+  };
+
+  // A click on a group's own eye/highlight button should toggle every layer in that
+  // group, not expand/collapse the <details> — stop the click reaching <summary>.
+  const stopSummaryToggle = event => { event.preventDefault(); event.stopPropagation(); };
+
+  const createGroupRow = (label, leaves) => {
+    const summary = document.createElement('summary');
+    const line = document.createElement('span');
+    line.className = 'map-toggle-group-line';
+
+    const name = document.createElement('span');
+    name.className = 'map-toggle-name';
+    name.textContent = `${label} (${leaves.length})`;
+
+    const actions = document.createElement('div');
+    actions.className = 'map-toggle-actions';
+
+    const highlightAllBtn = document.createElement('button');
+    highlightAllBtn.type = 'button';
+    highlightAllBtn.className = 'map-toggle-btn map-toggle-highlight';
+    highlightAllBtn.innerHTML = HIGHLIGHT_ICON;
+    highlightAllBtn.addEventListener('click', event => {
+      stopSummaryToggle(event);
+      const highlightable = leaves.filter(l => !UNHIGHLIGHTABLE_TYPES.has(l.type));
+      const allHighlighted = highlightable.length > 0 && highlightable.every(l => highlightedLayers.has(l.id));
+      for (const l of highlightable) setHighlighted(l, !allHighlighted);
+      syncAllControls();
+    });
+
+    const eyeAllBtn = document.createElement('button');
+    eyeAllBtn.type = 'button';
+    eyeAllBtn.className = 'map-toggle-btn map-toggle-eye';
+    eyeAllBtn.addEventListener('click', event => {
+      stopSummaryToggle(event);
+      const allVisible = leaves.every(l => layerVisibility.get(l.id) ?? true);
+      for (const l of leaves) {
+        layerVisibility.set(l.id, !allVisible);
+        map.setLayoutProperty(l.id, 'visibility', allVisible ? 'none' : 'visible');
+      }
+      syncAllControls();
+    });
+
+    actions.append(highlightAllBtn, eyeAllBtn);
+    line.append(name, actions);
+    summary.append(line);
+
+    groupEntries.push({
+      update: () => {
+        const allVisible = leaves.every(l => layerVisibility.get(l.id) ?? true);
+        const noneVisible = leaves.every(l => !(layerVisibility.get(l.id) ?? true));
+        const state = allVisible ? 'visible' : noneVisible ? 'hidden' : 'mixed';
+        eyeAllBtn.innerHTML = state === 'hidden' ? EYE_OFF_ICON : EYE_ICON;
+        eyeAllBtn.classList.toggle('is-off', state !== 'visible');
+        eyeAllBtn.setAttribute('aria-pressed', String(state === 'visible'));
+        eyeAllBtn.setAttribute('aria-label', state === 'visible' ? `Hide all in ${label}` : `Show all in ${label}`);
+
+        const highlightable = leaves.filter(l => !UNHIGHLIGHTABLE_TYPES.has(l.type));
+        const allHighlighted = highlightable.length > 0 && highlightable.every(l => highlightedLayers.has(l.id));
+        highlightAllBtn.disabled = highlightable.length === 0;
+        highlightAllBtn.title = highlightable.length === 0 ? 'Not available for this group' : '';
+        highlightAllBtn.classList.toggle('is-active', allHighlighted);
+        highlightAllBtn.setAttribute('aria-pressed', String(allHighlighted));
+        highlightAllBtn.setAttribute('aria-label', highlightable.length === 0 ? `Highlighting unavailable for ${label}` : `${allHighlighted ? 'Clear highlight for' : 'Highlight'} all in ${label}`);
+      },
+    });
+
+    return summary;
+  };
+
+  const renderTreeNode = (node, container) => {
+    for (const [part, child] of node.children) {
+      if (child.children.size === 0) {
+        container.append(createLayerRow(child.layer, part));
+        continue;
+      }
+
+      const details = document.createElement('details');
+      details.className = 'map-toggle-group';
+      details.append(createGroupRow(part, collectLeaves(child)));
+
+      const childWrap = document.createElement('div');
+      childWrap.className = 'map-toggle-children';
+      if (child.layer) childWrap.append(createLayerRow(child.layer, part));
+      renderTreeNode(child, childWrap);
+      details.append(childWrap);
+
+      container.append(details);
+    }
+  };
+
+  const renderLayerControls = () => {
+    allLayers = map.getStyle().layers ?? [];
+    highlightedLayers.clear();
+    rowEntries = [];
+    groupEntries = [];
+    layerList.replaceChildren();
+    layerCount.value = layerCount.textContent = `${allLayers.length} total`;
+    renderTreeNode(buildLayerTree(allLayers), layerList);
+    syncAllControls();
+  };
+
+  resetButton.addEventListener('click', () => {
+    for (const layer of allLayers) {
+      layerVisibility.set(layer.id, true);
+      map.setLayoutProperty(layer.id, 'visibility', 'visible');
+      setHighlighted(layer, false);
+    }
+    syncAllControls();
+  });
+
+  map.on('load', () => {
+    map.resize();
+    renderLayerControls();
+  });
+  map.on('style.load', renderLayerControls);
+
+  styleSelect.addEventListener('change', () => map.setStyle(styles[styleSelect.value]));
+  locateButton.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      coordinateOutput.value = coordinateOutput.textContent = 'Location is unavailable in this browser';
+      return;
+    }
+    locateButton.disabled = true;
+    locateButton.textContent = 'Finding…';
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const center = [position.coords.longitude, position.coords.latitude];
+        map.flyTo({ center, zoom: Math.max(map.getZoom(), 12), essential: true });
+        new maplibregl.Marker().setLngLat(center).addTo(map);
+        locateButton.disabled = false;
+        locateButton.textContent = 'Find me';
+      },
+      () => {
+        coordinateOutput.value = coordinateOutput.textContent = 'Could not access your location';
+        locateButton.disabled = false;
+        locateButton.textContent = 'Find me';
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  });
+</script>

@@ -8,6 +8,7 @@ export const projectIcons: Record<string, string> = {
   'six-second-scribbles': 'scribbles',
   'location-alarm': 'location-alarm',
   'we-climb-rocks': 'climb',
+  'map-playground': 'map',
 };
 
 export const iconFor = (id: string): string => projectIcons[id] ?? 'app';
