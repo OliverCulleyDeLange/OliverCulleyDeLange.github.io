@@ -12,6 +12,18 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
 
   <article class="lang-game">
+    <div class="filters" role="group" aria-label="Language pool">
+      <label class="filter-field">
+        <span class="field-label">Region</span>
+        <select id="continent-select"></select>
+      </label>
+      <label class="filter-field">
+        <span class="field-label">Difficulty</span>
+        <select id="level-select"></select>
+      </label>
+      <p class="filter-count" id="filter-count" aria-live="polite"></p>
+    </div>
+
     <div class="sources" id="sources" role="group" aria-label="Sentence source">
       <button type="button" class="source-btn is-active" id="source-random" aria-pressed="true">Random</button>
       <button type="button" class="source-btn" id="source-custom" aria-pressed="false" hidden>Custom</button>
@@ -171,6 +183,53 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
     text-transform: uppercase;
     color: var(--muted);
   }
+
+  /* ── Filters (region + difficulty) ── */
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 0.75rem;
+    align-items: end;
+  }
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+  .filter-field select {
+    font: inherit;
+    font-size: 0.9375rem;
+    color: var(--ink);
+    padding: 0.55rem 2rem 0.55rem 0.75rem;
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    cursor: pointer;
+    appearance: none;
+    /* A caret pinned to the right — colour rides on --muted so it flips with theme. */
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(-45deg, transparent 50%, currentColor 50%);
+    background-position: right 0.95rem top 50%, right 0.6rem top 50%;
+    background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+    background-repeat: no-repeat;
+    color: var(--ink);
+    transition: border-color 0.15s;
+  }
+  .filter-field select:hover { border-color: var(--muted); }
+  .filter-field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  .filter-count {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .filter-count.is-warn { color: var(--bad); }
 
   /* ── Source switch ── */
   .sources { display: flex; gap: 0.375rem; }
@@ -397,7 +456,16 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
 </style>
 
 <script>
-  import { LANGUAGES, SENTENCE_GLOSSES, type Language } from './_languages';
+  import {
+    LANGUAGES,
+    SENTENCE_GLOSSES,
+    CONTINENTS,
+    LEVELS,
+    filterLanguages,
+    type Language,
+    type Continent,
+    type Level,
+  } from './_languages';
 
   /**
    * Two sources for the sentence, and nothing else differs. "random" draws one of
@@ -420,6 +488,9 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   /** Baked into the one template sentence; there is no UI for these. */
   const NAME = 'Anna';
   const AGE = '30';
+  const DEFAULT_CONTINENT: Continent | 'all' = 'all';
+  /** Default to Easy so a fresh visit isn't the full 150-language firehose. */
+  const DEFAULT_LEVEL: Level = 'easy';
 
   /**
    * Chrome 138+ and Edge 148+ expose an on-device translator. Language packs are
@@ -438,6 +509,9 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
 
   const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+  const continentSelect = el<HTMLSelectElement>('continent-select');
+  const levelSelect = el<HTMLSelectElement>('level-select');
+  const filterCount = el<HTMLElement>('filter-count');
   const randomBtn = el<HTMLButtonElement>('source-random');
   const customBtn = el<HTMLButtonElement>('source-custom');
   const customEl = el<HTMLElement>('custom');
@@ -468,6 +542,8 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
 
   let source = 'random' as Source;
   let customSentence = DEFAULT_CUSTOM;
+  let continent: Continent | 'all' = DEFAULT_CONTINENT;
+  let level: Level = DEFAULT_LEVEL;
   let question: Question | null = null;
   let answered = false;
   let deck: Language[] = [];
@@ -490,20 +566,34 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
 
   function savePrefs(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ source, customSentence }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        source, customSentence, continent, level,
+      }));
     } catch {
       /* private browsing, blocked storage — the page still works */
     }
   }
 
+  const CONTINENT_IDS = new Set(CONTINENTS.map(c => c.id));
+  const LEVEL_IDS = new Set(LEVELS.map(l => l.id));
+
   function loadPrefs(): void {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      const saved = JSON.parse(raw) as { source?: unknown; customSentence?: unknown };
+      const saved = JSON.parse(raw) as {
+        source?: unknown; customSentence?: unknown;
+        continent?: unknown; level?: unknown;
+      };
       if (saved.source === 'custom' || saved.source === 'random') source = saved.source;
       if (typeof saved.customSentence === 'string' && saved.customSentence.trim()) {
         customSentence = saved.customSentence.slice(0, 120);
+      }
+      if (saved.continent === 'all' || (typeof saved.continent === 'string' && CONTINENT_IDS.has(saved.continent as Continent))) {
+        continent = saved.continent as Continent | 'all';
+      }
+      if (typeof saved.level === 'string' && LEVEL_IDS.has(saved.level as Level)) {
+        level = saved.level as Level;
       }
     } catch {
       /* unreadable or malformed — fall back to the defaults */
@@ -651,11 +741,34 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   }
 
   // ── Dealing ──────────────────────────────────────────────────────────────
-  /** In custom mode the pool shrinks to what the browser can actually translate. */
+  /** The filter selects the answer pool. In custom mode it intersects with
+   * what the browser can actually translate — otherwise the app deals a
+   * language it then cannot render. */
   function currentPool(): Language[] {
-    return source === 'custom' && translatable
+    const filtered = filterLanguages(continent, level);
+    if (source === 'custom' && translatable) {
+      return filtered.filter(l => translatable!.has(l.id));
+    }
+    return filtered;
+  }
+
+  /** Distractors normally come from the same pool, but when the filter is
+   * narrow (e.g. Americas + Easy has one language) we widen to keep the round
+   * playable rather than dealing the answer as its own distractor. */
+  function distractorPool(): Language[] {
+    const answerPool = currentPool();
+    if (answerPool.length >= OPTION_COUNT) return answerPool;
+    // Widen level first (keeps the region flavour), then drop the region if
+    // still too small. Falls all the way back to LANGUAGES in the worst case.
+    const relaxedLevel = filterLanguages(continent, 'hard');
+    const withCustom = source === 'custom' && translatable
+      ? relaxedLevel.filter(l => translatable!.has(l.id))
+      : relaxedLevel;
+    if (withCustom.length >= OPTION_COUNT) return withCustom;
+    const relaxedAll = source === 'custom' && translatable
       ? LANGUAGES.filter(l => translatable!.has(l.id))
       : LANGUAGES;
+    return relaxedAll;
   }
 
   function dealLanguage(): Language {
@@ -679,10 +792,13 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
 
   /**
    * One plausible near-neighbour from the same family, then whatever else fits —
-   * enough to make the options a real choice without being a coin flip.
+   * enough to make the options a real choice without being a coin flip. Draws
+   * from the filtered pool so distractors stay inside the player's chosen
+   * region and difficulty (widened only if the filter is too narrow).
    */
   function pickDistractors(answerLanguage: Language): Language[] {
-    const others = LANGUAGES.filter(l => l.id !== answerLanguage.id);
+    const pool = distractorPool();
+    const others = pool.filter(l => l.id !== answerLanguage.id);
     const sameFamily = others.filter(l => l.family === answerLanguage.family);
     const sameScript = others.filter(l => l.script === answerLanguage.script && l.family !== answerLanguage.family);
     const unrelated = others.filter(l => l.family !== answerLanguage.family && l.script !== answerLanguage.script);
@@ -704,6 +820,17 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   // ── The round ────────────────────────────────────────────────────────────
   function askQuestion(): void {
     if (source === 'custom' && (!translatable || translatable.size === 0)) {
+      setLoading(false);
+      sentenceEl.textContent = '—';
+      answerForm.hidden = true;
+      optionsEl.hidden = true;
+      verdictRow.hidden = true;
+      labelEl.hidden = true;
+      return;
+    }
+    // Custom mode plus a tight filter can leave nothing to translate; distractor
+    // widening cannot rescue that because the answer itself has no candidate.
+    if (currentPool().length === 0) {
       setLoading(false);
       sentenceEl.textContent = '—';
       answerForm.hidden = true;
@@ -817,6 +944,52 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
     answer(language, 'typed');
   }
 
+  // ── Filters ──────────────────────────────────────────────────────────────
+  function populateFilters(): void {
+    // Continent gets an extra "any" entry that keeps the whole world in play.
+    const anyOpt = document.createElement('option');
+    anyOpt.value = 'all';
+    anyOpt.textContent = 'Any region';
+    continentSelect.appendChild(anyOpt);
+    for (const c of CONTINENTS) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      continentSelect.appendChild(opt);
+    }
+    for (const lv of LEVELS) {
+      const opt = document.createElement('option');
+      opt.value = lv.id;
+      opt.textContent = lv.name;
+      levelSelect.appendChild(opt);
+    }
+    continentSelect.value = continent;
+    levelSelect.value = level;
+  }
+
+  function updateFilterCount(): void {
+    const n = filterLanguages(continent, level).length;
+    filterCount.textContent = n === 1
+      ? '1 language in this pool'
+      : `${n} languages in this pool`;
+    filterCount.classList.toggle('is-warn', n < OPTION_COUNT);
+  }
+
+  // The bag is per-filter; changing the filter has to reset it so the new
+  // deck reflects the new pool.
+  function onFilterChange(): void {
+    const newContinent = continentSelect.value as Continent | 'all';
+    const newLevel = levelSelect.value as Level;
+    if (newContinent === continent && newLevel === level) return;
+    continent = newContinent;
+    level = newLevel;
+    deck = [];
+    justDealt = [];
+    savePrefs();
+    updateFilterCount();
+    askQuestion();
+  }
+
   // ── Source switch ────────────────────────────────────────────────────────
   async function setSource(next: Source, fresh = true): Promise<void> {
     source = next;
@@ -843,6 +1016,9 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   }
 
   // ── Wiring ───────────────────────────────────────────────────────────────
+  continentSelect.addEventListener('change', onFilterChange);
+  levelSelect.addEventListener('change', onFilterChange);
+
   randomBtn.addEventListener('click', () => void setSource('random'));
   customBtn.addEventListener('click', () => void setSource('custom'));
 
@@ -907,5 +1083,7 @@ const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
   if (source === 'custom' && !translatorApi) source = 'random';
   customText.value = customSentence;
   hintEl.textContent = DEFAULT_HINT;
+  populateFilters();
+  updateFilterCount();
   void setSource(source, true);
 </script>
