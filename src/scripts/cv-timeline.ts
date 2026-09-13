@@ -1,14 +1,18 @@
-export function drawCvTimeline(root = document) {
-  const container = root.querySelector('#timeline');
+type DatePoint = readonly [year: number, month: number, day?: number];
+type TimelineItem = readonly [text: string, start: DatePoint, end: DatePoint, top: number, kind: string];
+type TimelineGroup = { label: string; className?: string; height: number; items: readonly TimelineItem[] };
+
+export function drawCvTimeline(root: ParentNode = document) {
+  const container = root.querySelector<HTMLElement>('#timeline');
   if (!container || container.dataset.rendered) return;
   container.dataset.rendered = 'true';
 
   const firstYear = 2014;
   const now = new Date();
-  const today = [now.getFullYear(), now.getMonth(), now.getDate()];
-  const year = ([y, month, day = 1]) => y + (month + (day - 1) / 31) / 12;
+  const today: DatePoint = [now.getFullYear(), now.getMonth(), now.getDate()];
+  const year = ([y, month, day = 1]: DatePoint): number => y + (month + (day - 1) / 31) / 12;
   const lastYear = year(today);
-  const groups = [
+  const groups: readonly TimelineGroup[] = [
     { label: '', className: 'roles', height: 44, items: [
       ['Backend Java', [2014, 3], [2018, 6], 28, 'role'],
       ['Full stack', [2018, 6], [2019, 5], 28, 'role'],
@@ -36,7 +40,7 @@ export function drawCvTimeline(root = document) {
 
   const chart = document.createElement('div');
   chart.className = 'cv-timeline';
-  const percent = value => ((year(value) - firstYear) / (lastYear - firstYear)) * 100;
+  const percent = (value: DatePoint): number => ((year(value) - firstYear) / (lastYear - firstYear)) * 100;
   groups.forEach(group => {
     const row = document.createElement('div');
     row.className = `cv-timeline-row ${group.className ?? ''}`.trim();
