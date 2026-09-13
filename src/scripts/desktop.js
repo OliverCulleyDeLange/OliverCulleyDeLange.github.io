@@ -643,7 +643,7 @@ function openProject(project) {
 }
 
 function openCv(opts = {}) {
-  return openPage('/cv/', {
+  return openPage('/cv-dev/', {
     title: 'CV', icon: 'doc', size: { w: 820, h: 640 }, rect: opts.rect,
   }).then(win => {
     renderCvTimeline(win.body);
@@ -1088,7 +1088,7 @@ document.addEventListener('click', e => {
     showDesktop();
     return;
   }
-  const open = url === '/cv/' ? openCv() : openPage(url);
+  const open = url === '/cv-dev/' ? openCv() : openPage(url);
   open.then(win => {
     history.pushState({ url }, '', url);
     document.title = win.title + ' | oliverdelange';
