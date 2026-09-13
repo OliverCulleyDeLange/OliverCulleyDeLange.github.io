@@ -3171,3 +3171,136 @@ export const LANGUAGES: Language[] = [
     ],
   },
 ];
+
+// ── Region and difficulty classification ────────────────────────────────────
+// Kept as flat lists rather than a per-language field: easier to review and
+// reshuffle without touching 150 language literals.
+
+export type Continent = 'europe' | 'asia' | 'africa' | 'americas' | 'oceania' | 'other';
+export type Level = 'easy' | 'medium' | 'hard';
+
+export interface ContinentOption { id: Continent; name: string; }
+export interface LevelOption { id: Level; name: string; }
+
+export const CONTINENTS: ContinentOption[] = [
+  { id: 'europe', name: 'Europe' },
+  { id: 'asia', name: 'Asia' },
+  { id: 'africa', name: 'Africa' },
+  { id: 'americas', name: 'Americas' },
+  { id: 'oceania', name: 'Oceania' },
+  { id: 'other', name: 'Constructed & Classical' },
+];
+
+export const LEVELS: LevelOption[] = [
+  { id: 'easy', name: 'Easy' },
+  { id: 'medium', name: 'Medium' },
+  { id: 'hard', name: 'Hard' },
+];
+
+// Where a language is primarily used or originated. A few (Arabic, Turkish,
+// Malagasy) span borders — we pick the primary home rather than duplicate them.
+const CONTINENT_BUCKETS: Record<Continent, string[]> = {
+  europe: [
+    'spanish', 'portuguese', 'italian', 'french', 'romanian', 'catalan',
+    'german', 'dutch', 'swedish', 'danish', 'norwegian', 'icelandic',
+    'polish', 'czech', 'slovak', 'croatian', 'russian', 'ukrainian', 'bulgarian',
+    'greek', 'finnish', 'estonian', 'hungarian', 'lithuanian', 'latvian', 'albanian',
+    'serbian', 'slovenian', 'macedonian', 'belarusian', 'galician',
+    'maltese', 'luxembourgish', 'faroese', 'frisian',
+    'welsh', 'irish', 'basque', 'scottishgaelic', 'breton', 'occitan',
+    'yiddish', 'corsican', 'sardinian', 'aragonese', 'cornish', 'manx',
+    'limburgish', 'walloon', 'northernsami', 'nynorsk',
+  ],
+  asia: [
+    'turkish', 'arabic', 'hebrew', 'persian',
+    'hindi', 'bengali', 'urdu', 'punjabi', 'gujarati', 'marathi', 'nepali',
+    'odia', 'assamese', 'sinhala', 'sindhi', 'divehi',
+    'tamil', 'telugu', 'kannada', 'malayalam',
+    'japanese', 'korean', 'mandarin',
+    'vietnamese', 'khmer', 'thai', 'lao',
+    'indonesian', 'malay', 'javanese', 'tagalog', 'cebuano', 'sundanese',
+    'burmese', 'dzongkha', 'tibetan',
+    'azerbaijani', 'uzbek', 'turkmen', 'kazakh', 'kyrgyz', 'uyghur',
+    'mongolian', 'tajik', 'pashto', 'kurdish', 'ossetian',
+    'armenian', 'georgian',
+    'tatar', 'bashkir', 'chuvash', 'chechen',
+  ],
+  africa: [
+    'afrikaans', 'swahili', 'chichewa',
+    'zulu', 'xhosa', 'shona', 'kinyarwanda', 'luganda', 'kikuyu', 'kirundi',
+    'lingala', 'sesotho', 'setswana', 'siswati', 'ndebele',
+    'malagasy', 'amharic', 'tigrinya', 'somali', 'oromo',
+    'hausa', 'yoruba', 'igbo', 'wolof', 'bambara', 'twi', 'ewe',
+  ],
+  americas: ['haitiancreole', 'quechua', 'aymara', 'guarani', 'greenlandic'],
+  oceania: [
+    'tokpisin', 'bislama',
+    'maori', 'samoan', 'hawaiian', 'fijian', 'tongan', 'tahitian',
+  ],
+  other: ['latin', 'sanskrit', 'esperanto', 'interlingua', 'ido', 'volapuk'],
+};
+
+// The 30 languages a casual player has the best chance of recognising: the
+// major Romance and Germanic tongues, the big Slavics, and the world's
+// household-name Asian, African and Polynesian languages.
+const LEVEL_EASY_IDS: string[] = [
+  'spanish', 'portuguese', 'italian', 'french',
+  'german', 'dutch', 'swedish', 'danish', 'norwegian',
+  'polish', 'russian', 'ukrainian',
+  'greek',
+  'arabic', 'hebrew', 'hindi',
+  'japanese', 'korean', 'mandarin',
+  'vietnamese', 'thai', 'indonesian', 'turkish',
+  'afrikaans', 'swahili',
+  'maori', 'hawaiian',
+  'haitiancreole',
+  'latin', 'esperanto',
+];
+
+// Middle tier: less mainstream but still recognisable — regional standards,
+// smaller Europeans, and languages a curious reader has probably heard of.
+const LEVEL_MEDIUM_ONLY_IDS: string[] = [
+  'catalan', 'romanian', 'icelandic',
+  'czech', 'slovak', 'croatian', 'serbian', 'bulgarian',
+  'finnish', 'estonian', 'hungarian',
+  'lithuanian', 'latvian', 'albanian',
+  'persian', 'bengali', 'urdu',
+  'tagalog', 'malay',
+  'welsh', 'irish', 'basque', 'scottishgaelic',
+  'slovenian', 'macedonian', 'belarusian', 'galician', 'yiddish',
+  'punjabi', 'gujarati', 'marathi', 'nepali',
+  'tamil', 'telugu', 'kannada', 'malayalam', 'sinhala',
+  'burmese', 'khmer', 'lao', 'javanese',
+  'azerbaijani', 'uzbek', 'kazakh', 'kyrgyz', 'mongolian',
+  'kurdish', 'armenian', 'georgian',
+  'amharic', 'somali', 'yoruba', 'zulu', 'xhosa',
+];
+
+const EASY_SET = new Set(LEVEL_EASY_IDS);
+const MEDIUM_SET = new Set(LEVEL_MEDIUM_ONLY_IDS);
+
+export const LANGUAGE_CONTINENT: Record<string, Continent> = (() => {
+  const out: Record<string, Continent> = {};
+  for (const [continent, ids] of Object.entries(CONTINENT_BUCKETS) as Array<[Continent, string[]]>) {
+    for (const id of ids) out[id] = continent;
+  }
+  return out;
+})();
+
+export const LANGUAGE_LEVEL: Record<string, Level> = Object.fromEntries(
+  LANGUAGES.map(l => [l.id, EASY_SET.has(l.id) ? 'easy' : MEDIUM_SET.has(l.id) ? 'medium' : 'hard'] as const),
+);
+
+const LEVEL_RANK: Record<Level, number> = { easy: 0, medium: 1, hard: 2 };
+
+/**
+ * Every language that survives the current filter. Difficulty is a cap, not a
+ * band: "medium" includes easy, "hard" is the whole roster.
+ */
+export function filterLanguages(continent: Continent | 'all', level: Level): Language[] {
+  const cap = LEVEL_RANK[level];
+  return LANGUAGES.filter(l => {
+    if (continent !== 'all' && LANGUAGE_CONTINENT[l.id] !== continent) return false;
+    return LEVEL_RANK[LANGUAGE_LEVEL[l.id]] <= cap;
+  });
+}
