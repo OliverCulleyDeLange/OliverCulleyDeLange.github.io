@@ -1,0 +1,23 @@
+---
+name: "Language Guesser"
+tagline: "Name the language a sentence is written in"
+appUrl: "/language-guesser/"
+appLabel: "Open"
+order: 6
+---
+
+Quick vibe coded game. My friend made a bold claim that he could recognise most languages from seeing them written down. I doubted him. Couldn't find anything online to test his claim, so got Claude to build it from my phone. 
+
+This is the first time I've vibe coded something purely from my phone. Crazy how far Ai has come. 
+
+# How it works (AI slop description)
+
+A sentence appears in one of 150 languages, across 27 writing systems, and you name it. Type an answer, or fall back to four options where one is always a plausible near-neighbour from the same family. 
+
+No score, no rounds, no end. Languages are dealt from a shuffled deck, so all 150 come up before any repeats, and the sentence is drawn at random from ten.
+
+On Chrome and Edge there is a second source: your own sentence, translated by the browser's built-in on-device translator (the [Translator API](https://developer.chrome.com/docs/ai/translator-api), stable since Chrome 138). Packs download once and translation then runs locally, so nothing you type leaves the machine. It covers whatever subset of the 150 your browser has models for. Firefox and Safari have no equivalent, so the option simply is not offered there.
+
+Because every language translates the *same* ten sentences, there are no topic clues anywhere: no place names, no borrowed words to latch onto. All you have is the orthography.
+
+Built as a single Astro page with vanilla TypeScript: no framework, and the whole 1,500-sentence corpus ships with the page.

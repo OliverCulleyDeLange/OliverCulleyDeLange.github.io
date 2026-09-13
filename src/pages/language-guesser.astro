@@ -1,0 +1,911 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { LANGUAGES } from './_languages';
+
+const languageCount = LANGUAGES.length;
+const scriptCount = new Set(LANGUAGES.map(l => l.script)).size;
+---
+<BaseLayout
+  title="Language Guesser"
+  description={`Name the language a sentence is written in, across ${languageCount} languages and ${scriptCount} writing systems.`}
+>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
+
+  <article class="lang-game">
+    <div class="sources" id="sources" role="group" aria-label="Sentence source">
+      <button type="button" class="source-btn is-active" id="source-random" aria-pressed="true">Random</button>
+      <button type="button" class="source-btn" id="source-custom" aria-pressed="false" hidden>Custom</button>
+    </div>
+
+    <div class="custom" id="custom" hidden>
+      <label class="field-label" for="custom-text">Sentence to translate</label>
+      <input
+        type="text"
+        id="custom-text"
+        maxlength="120"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <p class="custom-status" id="custom-status"></p>
+    </div>
+
+    <figure class="plate" id="plate">
+      <blockquote class="specimen" id="sentence">&nbsp;</blockquote>
+      <span class="loader" aria-hidden="true">
+        <span class="loader-dots"><i></i><i></i><i></i></span>
+        Translating…
+      </span>
+    </figure>
+
+
+    <form class="answer" id="answer-form" autocomplete="off">
+      <label class="field-label" for="guess">Name the language</label>
+      <div class="answer-row">
+        <input
+          type="text"
+          id="guess"
+          name="guess"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          enterkeyhint="go"
+        />
+        <button type="submit" class="btn btn-primary" id="guess-btn">Check</button>
+        <button type="button" class="btn btn-secondary" id="reveal-btn">Show options</button>
+      </div>
+      <p class="hint" id="hint"></p>
+    </form>
+
+    <div class="options" id="options" role="group" aria-label="Which language is this?" hidden>
+      <button type="button" class="option" data-index="0"><kbd>1</kbd><span class="option-name"></span></button>
+      <button type="button" class="option" data-index="1"><kbd>2</kbd><span class="option-name"></span></button>
+      <button type="button" class="option" data-index="2"><kbd>3</kbd><span class="option-name"></span></button>
+      <button type="button" class="option" data-index="3"><kbd>4</kbd><span class="option-name"></span></button>
+    </div>
+
+    <div class="verdict-row" id="verdict-row" hidden>
+      <p class="verdict" id="verdict" aria-live="polite"></p>
+      <button type="button" class="btn btn-primary" id="next-btn">Next</button>
+    </div>
+    <dl class="label" id="label" hidden>
+      <div class="label-name">
+        <dt>Language</dt>
+        <dd id="lb-name"></dd>
+      </div>
+      <div>
+        <dt>Tag</dt>
+        <dd><code id="lb-tag"></code></dd>
+      </div>
+      <div>
+        <dt>Family</dt>
+        <dd id="lb-family"></dd>
+      </div>
+      <div>
+        <dt>Script</dt>
+        <dd id="lb-script"></dd>
+      </div>
+      <div class="label-wide">
+        <dt>Means</dt>
+        <dd id="lb-gloss"></dd>
+      </div>
+      <div class="label-wide">
+        <dt>Giveaway</dt>
+        <dd id="lb-tell"></dd>
+      </div>
+    </dl>
+  </article>
+</BaseLayout>
+
+<style>
+  /* ── Tokens ──────────────────────────────────────────────────────────────
+     Declared on :root so the page and the standalone build share one source.
+     Neutrals carry a slight blue bias toward the accent rather than being
+     pure grey; the semantic pair stays separate from the accent hue. */
+  :global(:root) {
+    --paper: #f5f6f8;
+    --plate: #ffffff;
+    --ink: #14161b;
+    --muted: #646b7a;
+    --rule: #e0e4ea;
+    --accent: #3d3bc6;
+    --accent-ink: #ffffff;
+    --accent-wash: #ececfa;
+    --good: #0f7a4d;
+    --bad: #b4243c;
+    --shadow: 0 1px 2px rgba(20, 22, 27, 0.04), 0 8px 24px -12px rgba(20, 22, 27, 0.18);
+    --ui: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    /* The specimen must render 27 writing systems, so it stays on whatever the
+       reader's system provides — no webfont covers them all. */
+    --specimen: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) {
+      --paper: #0e0f13;
+      --plate: #16181e;
+      --ink: #e9ebf0;
+      --muted: #8b93a5;
+      --rule: #262a33;
+      --accent: #9d9bff;
+      --accent-ink: #12131a;
+      --accent-wash: #1c1d2b;
+      --good: #4ade80;
+      --bad: #fb7185;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+    }
+  }
+  :global(:root[data-theme='dark']) {
+    --paper: #0e0f13;
+    --plate: #16181e;
+    --ink: #e9ebf0;
+    --muted: #8b93a5;
+    --rule: #262a33;
+    --accent: #9d9bff;
+    --accent-ink: #12131a;
+    --accent-wash: #1c1d2b;
+    --good: #4ade80;
+    --bad: #fb7185;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  }
+
+  .lang-game {
+    font-family: var(--ui);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+  /* Several blocks below set display, which otherwise beats the hidden
+     attribute and leaves them on screen when the page means to hide them. */
+  .lang-game [hidden] { display: none !important; }
+
+  .field-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Source switch ── */
+  .sources { display: flex; gap: 0.375rem; }
+  .source-btn {
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.3rem 0.85rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .source-btn:hover { color: var(--ink); border-color: var(--muted); }
+  .source-btn.is-active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .source-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── Custom sentence ── */
+  .custom { display: flex; flex-direction: column; gap: 0.4rem; }
+  .custom-status { font-size: 0.75rem; line-height: 1.5; color: var(--muted); margin: 0; }
+  .custom-status.is-error { color: var(--bad); }
+
+  /* ── The specimen plate: the one lifted object on the page ── */
+  .plate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 11rem;
+    padding: 2.5rem 1.75rem;
+    margin: 0;
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  .specimen {
+    font-family: var(--specimen);
+    font-size: clamp(1.35rem, 1.1rem + 1.2vw, 1.75rem);
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+    text-align: center;
+    text-wrap: balance;
+    margin: 0;
+    transition: opacity 0.18s ease;
+  }
+  .specimen[dir='rtl'] { line-height: 1.95; }
+  .plate.is-loading .specimen { opacity: 0; }
+
+  /* ── Loading overlay ── */
+  .loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .plate.is-loading .loader { opacity: 1; }
+  .loader-dots { display: inline-flex; gap: 0.25rem; }
+  .loader-dots i {
+    width: 0.3rem;
+    height: 0.3rem;
+    background: currentColor;
+    border-radius: 50%;
+    opacity: 0.35;
+    animation: loader-pulse 1.05s ease-in-out infinite;
+  }
+  .loader-dots i:nth-child(2) { animation-delay: 0.15s; }
+  .loader-dots i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes loader-pulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+    40%           { opacity: 1;    transform: scale(1); }
+  }
+
+  /* ── Specimen label ── */
+  .label {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .label > div { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+  .label-name { grid-column: 1 / -1; }
+  .label-wide { grid-column: 1 / -1; }
+  .label dt {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .label dd { margin: 0; font-size: 0.875rem; line-height: 1.55; }
+  .label-name dd { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.015em; }
+  .label code {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  /* ── Answering ── */
+  .answer { display: flex; flex-direction: column; gap: 0.5rem; }
+  .answer-row { display: flex; gap: 0.5rem; }
+  .answer-row input, .custom input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--ink);
+    padding: 0.6rem 0.8rem;
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    transition: border-color 0.15s;
+  }
+  .answer-row input::placeholder, .custom input::placeholder { color: var(--muted); opacity: 0.7; }
+  .answer-row input:focus, .custom input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  .hint { font-size: 0.75rem; line-height: 1.5; color: var(--muted); margin: 0; }
+  .hint.is-error { color: var(--bad); }
+
+  /* ── Options ── */
+  .options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font: inherit;
+    font-size: 0.9375rem;
+    text-align: left;
+    padding: 0.65rem 0.8rem;
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .option:hover:not(:disabled) { border-color: var(--accent); }
+  .option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .option:disabled { cursor: default; }
+  .option kbd {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    line-height: 1;
+    padding: 0.25rem 0.35rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--muted);
+  }
+  .option.is-correct { border-color: var(--good); background: color-mix(in srgb, var(--good) 9%, var(--plate)); }
+  .option.is-wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 9%, var(--plate)); }
+  .option.is-correct kbd, .option.is-wrong kbd { border-color: currentColor; }
+  .option.is-muted { opacity: 0.45; }
+
+  /* ── Verdict ── */
+  .verdict-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .verdict { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+  .verdict.is-correct { color: var(--good); }
+  .verdict.is-wrong { color: var(--bad); }
+
+  /* ── Buttons ── */
+  .btn {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.6rem 1.15rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border-color: var(--rule);
+  }
+  .btn-secondary:hover { border-color: var(--accent); background: var(--accent-wash); }
+  .btn-secondary:disabled { opacity: 0.5; cursor: default; }
+
+  @media (max-width: 560px) {
+    .options { grid-template-columns: 1fr; }
+    .label { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .plate { padding: 2rem 1.25rem; min-height: 9rem; }
+    .answer-row { flex-wrap: wrap; }
+    .answer-row input { flex-basis: 100%; }
+    .answer-row .btn { flex: 1; }
+    .verdict-row { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .specimen, .btn, .option, .source-btn, .loader { transition: none; }
+    .loader-dots i { animation: none; opacity: 0.6; }
+  }
+</style>
+
+<script>
+  import { LANGUAGES, SENTENCE_GLOSSES, type Language } from './_languages';
+
+  /**
+   * Two sources for the sentence, and nothing else differs. "random" draws one of
+   * the ten built-in sentences; "custom" translates whatever you typed, on the
+   * device, and only exists where the browser can do that.
+   */
+  type Source = 'random' | 'custom';
+
+  interface Question {
+    language: Language;
+    sentenceIndex: number;
+    options: Language[];
+  }
+
+  const OPTION_COUNT = 4;
+  /** How many of the most recent languages a freshly shuffled bag holds back. */
+  const BAG_EDGE = 5;
+  const STORAGE_KEY = 'language-guesser:v2';
+  const DEFAULT_CUSTOM = 'Hello, what is your name?';
+  /** Baked into the one template sentence; there is no UI for these. */
+  const NAME = 'Anna';
+  const AGE = '30';
+
+  /**
+   * Chrome 138+ and Edge 148+ expose an on-device translator. Language packs are
+   * fetched once and then it runs locally — no server sees the sentence. Firefox
+   * and Safari have nothing equivalent, so custom stays a progressive enhancement.
+   */
+  interface BrowserTranslator {
+    translate(input: string): Promise<string>;
+  }
+  interface TranslatorFactory {
+    availability(options: { sourceLanguage: string; targetLanguage: string }): Promise<string>;
+    create(options: { sourceLanguage: string; targetLanguage: string }): Promise<BrowserTranslator>;
+  }
+  const translatorApi: TranslatorFactory | null =
+    'Translator' in self ? (self as unknown as { Translator: TranslatorFactory }).Translator : null;
+
+  const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  const randomBtn = el<HTMLButtonElement>('source-random');
+  const customBtn = el<HTMLButtonElement>('source-custom');
+  const customEl = el<HTMLElement>('custom');
+  const customText = el<HTMLInputElement>('custom-text');
+  const customStatus = el<HTMLElement>('custom-status');
+  const plate = el<HTMLElement>('plate');
+  const sentenceEl = el<HTMLElement>('sentence');
+  const labelEl = el<HTMLElement>('label');
+  const lbName = el<HTMLElement>('lb-name');
+  const lbTag = el<HTMLElement>('lb-tag');
+  const lbFamily = el<HTMLElement>('lb-family');
+  const lbScript = el<HTMLElement>('lb-script');
+  const lbGloss = el<HTMLElement>('lb-gloss');
+  const lbTell = el<HTMLElement>('lb-tell');
+  const answerForm = el<HTMLFormElement>('answer-form');
+  const guessInput = el<HTMLInputElement>('guess');
+  const hintEl = el<HTMLElement>('hint');
+  const revealBtn = el<HTMLButtonElement>('reveal-btn');
+  const optionsEl = el<HTMLElement>('options');
+  const optionBtns = Array.from(optionsEl.querySelectorAll<HTMLButtonElement>('.option'));
+  const verdictRow = el<HTMLElement>('verdict-row');
+  const verdictEl = el<HTMLElement>('verdict');
+  const nextBtn = el<HTMLButtonElement>('next-btn');
+
+  const DEFAULT_HINT = '';
+  /** Focusing every question would keep reopening the keyboard on a phone. */
+  const autoFocus = window.matchMedia('(pointer: fine)').matches;
+
+  let source = 'random' as Source;
+  let customSentence = DEFAULT_CUSTOM;
+  let question: Question | null = null;
+  let answered = false;
+  let deck: Language[] = [];
+  let justDealt: string[] = [];
+  /** Which of the languages this browser can translate into; null until probed. */
+  let translatable: Set<string> | null = null;
+  const translators = new Map<string, Promise<BrowserTranslator>>();
+  /** Guards against a slow translation landing after the player moved on. */
+  let renderToken = 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function shuffle<T>(items: T[]): T[] {
+    const out = items.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  function savePrefs(): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ source, customSentence }));
+    } catch {
+      /* private browsing, blocked storage — the page still works */
+    }
+  }
+
+  function loadPrefs(): void {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { source?: unknown; customSentence?: unknown };
+      if (saved.source === 'custom' || saved.source === 'random') source = saved.source;
+      if (typeof saved.customSentence === 'string' && saved.customSentence.trim()) {
+        customSentence = saved.customSentence.slice(0, 120);
+      }
+    } catch {
+      /* unreadable or malformed — fall back to the defaults */
+    }
+  }
+
+  /** The one template sentence carries slots; fill them with the fixed values. */
+  const fill = (text: string) => text.replace(/\{name\}/g, NAME).replace(/\{age\}/g, AGE);
+
+  // ── Matching a typed answer ──────────────────────────────────────────────
+  /** Fold case, accents and punctuation away so "Türkçe" and "turkce" agree. */
+  function normalize(text: string): string {
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z]/g, '');
+  }
+
+  /** Levenshtein distance, abandoned as soon as it exceeds the budget. */
+  function editDistance(a: string, b: string, budget: number): number {
+    if (Math.abs(a.length - b.length) > budget) return budget + 1;
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const row = [i];
+      let rowMin = i;
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        const value = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+        row.push(value);
+        if (value < rowMin) rowMin = value;
+      }
+      if (rowMin > budget) return budget + 1;
+      prev = row;
+    }
+    return prev[b.length];
+  }
+
+  interface GuessMatch {
+    language: Language | null;
+    /** Two languages were an equally good near-miss, so we can't pick for them. */
+    ambiguous: boolean;
+  }
+
+  function matchGuess(raw: string): GuessMatch {
+    const query = normalize(raw);
+    if (query.length < 2) return { language: null, ambiguous: false };
+    const namesOf = (l: Language) => [l.name, ...(l.aliases ?? [])];
+
+    for (const language of LANGUAGES) {
+      if (namesOf(language).some(name => normalize(name) === query)) {
+        return { language, ambiguous: false };
+      }
+    }
+
+    // Near-misses: one edit for short names, two for long ones. A tie between two
+    // different languages ("sanish" sits between Spanish and Danish) is no match.
+    let best: Language | null = null;
+    let bestDistance = Infinity;
+    let tied = false;
+    for (const language of LANGUAGES) {
+      for (const name of namesOf(language)) {
+        const candidate = normalize(name);
+        const budget = candidate.length >= 8 ? 2 : candidate.length >= 5 ? 1 : 0;
+        if (budget === 0) continue;
+        const distance = editDistance(query, candidate, budget);
+        if (distance > budget) continue;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = language;
+          tied = false;
+        } else if (distance === bestDistance && best && language.id !== best.id) {
+          tied = true;
+        }
+      }
+    }
+    if (!best || tied) return { language: null, ambiguous: tied };
+    return { language: best, ambiguous: false };
+  }
+
+  // ── On-device translation ────────────────────────────────────────────────
+  async function probeTranslatable(): Promise<Set<string>> {
+    if (translatable) return translatable;
+    const found = new Set<string>();
+    if (!translatorApi) return (translatable = found);
+    await Promise.all(LANGUAGES.map(async language => {
+      try {
+        const state = await translatorApi.availability({
+          sourceLanguage: 'en',
+          targetLanguage: language.bcp47,
+        });
+        if (state !== 'unavailable') found.add(language.id);
+      } catch {
+        /* an unrecognised tag just means no */
+      }
+    }));
+    translatable = found;
+    return found;
+  }
+
+  function translatorFor(language: Language): Promise<BrowserTranslator> {
+    let pending = translators.get(language.bcp47);
+    if (!pending) {
+      pending = translatorApi!.create({ sourceLanguage: 'en', targetLanguage: language.bcp47 });
+      translators.set(language.bcp47, pending);
+    }
+    return pending;
+  }
+
+  function customStatusLine(): string {
+    const n = translatable?.size ?? 0;
+    return `Translated on your device into the ${n} languages your browser supports. `
+      + 'Machine translation, so treat it as a rough guide.';
+  }
+
+  function setLoading(on: boolean): void {
+    plate.classList.toggle('is-loading', on);
+    if (on) plate.setAttribute('aria-busy', 'true');
+    else plate.removeAttribute('aria-busy');
+  }
+
+  async function renderCustom(q: Question, token: number): Promise<void> {
+    if (!customSentence) {
+      setLoading(false);
+      sentenceEl.textContent = 'Type a sentence above.';
+      return;
+    }
+    setLoading(true);
+    try {
+      const translator = await translatorFor(q.language);
+      const text = await translator.translate(customSentence);
+      if (token !== renderToken) return;
+      sentenceEl.textContent = text;
+      setLoading(false);
+      customStatus.textContent = customStatusLine();
+      customStatus.classList.remove('is-error');
+    } catch {
+      if (token !== renderToken) return;
+      setLoading(false);
+      customStatus.textContent = 'That language pack would not load — trying another language.';
+      customStatus.classList.add('is-error');
+      translators.delete(q.language.bcp47);
+      askQuestion();
+    }
+  }
+
+  // ── Dealing ──────────────────────────────────────────────────────────────
+  /** In custom mode the pool shrinks to what the browser can actually translate. */
+  function currentPool(): Language[] {
+    return source === 'custom' && translatable
+      ? LANGUAGES.filter(l => translatable!.has(l.id))
+      : LANGUAGES;
+  }
+
+  function dealLanguage(): Language {
+    const pool = currentPool();
+    const poolIds = new Set(pool.map(l => l.id));
+    if (deck.some(l => !poolIds.has(l.id))) deck = deck.filter(l => poolIds.has(l.id));
+    if (deck.length === 0) {
+      // Cards are dealt off the end, so the languages that just closed the last
+      // bag go to the front — otherwise they can land again a question or two later.
+      const bag = shuffle(pool);
+      deck = [
+        ...bag.filter(l => justDealt.includes(l.id)),
+        ...bag.filter(l => !justDealt.includes(l.id)),
+      ];
+    }
+    const next = deck.pop() as Language;
+    justDealt.push(next.id);
+    if (justDealt.length > BAG_EDGE) justDealt.shift();
+    return next;
+  }
+
+  /**
+   * One plausible near-neighbour from the same family, then whatever else fits —
+   * enough to make the options a real choice without being a coin flip.
+   */
+  function pickDistractors(answerLanguage: Language): Language[] {
+    const others = LANGUAGES.filter(l => l.id !== answerLanguage.id);
+    const sameFamily = others.filter(l => l.family === answerLanguage.family);
+    const sameScript = others.filter(l => l.script === answerLanguage.script && l.family !== answerLanguage.family);
+    const unrelated = others.filter(l => l.family !== answerLanguage.family && l.script !== answerLanguage.script);
+    const pools = [
+      shuffle(sameFamily).slice(0, 1),
+      shuffle([...sameScript, ...unrelated]),
+      shuffle(sameFamily),
+    ];
+    const picked: Language[] = [];
+    for (const pool of pools) {
+      for (const candidate of pool) {
+        if (picked.length === OPTION_COUNT - 1) break;
+        if (!picked.some(p => p.id === candidate.id)) picked.push(candidate);
+      }
+    }
+    return picked;
+  }
+
+  // ── The round ────────────────────────────────────────────────────────────
+  function askQuestion(): void {
+    if (source === 'custom' && (!translatable || translatable.size === 0)) {
+      setLoading(false);
+      sentenceEl.textContent = '—';
+      answerForm.hidden = true;
+      optionsEl.hidden = true;
+      verdictRow.hidden = true;
+      labelEl.hidden = true;
+      return;
+    }
+
+    const language = dealLanguage();
+    question = {
+      language,
+      sentenceIndex: Math.floor(Math.random() * language.sentences.length),
+      options: shuffle([language, ...pickDistractors(language)]),
+    };
+    answered = false;
+
+    sentenceEl.dir = language.rtl ? 'rtl' : 'ltr';
+    // The lang tag is only set on reveal — otherwise it sits in the DOM as the answer.
+    sentenceEl.removeAttribute('lang');
+    if (source === 'custom') {
+      renderCustom(question, ++renderToken);
+    } else {
+      setLoading(false);
+      sentenceEl.textContent = fill(language.sentences[question.sentenceIndex]);
+    }
+
+    optionBtns.forEach((btn, i) => {
+      const option = question!.options[i];
+      btn.querySelector('.option-name')!.textContent = option.name;
+      btn.dataset.languageId = option.id;
+      btn.className = 'option';
+      btn.disabled = false;
+    });
+
+    answerForm.hidden = false;
+    guessInput.value = '';
+    guessInput.disabled = false;
+    revealBtn.disabled = false;
+    hintEl.textContent = DEFAULT_HINT;
+    hintEl.classList.remove('is-error');
+    optionsEl.hidden = true;
+    verdictRow.hidden = true;
+    labelEl.hidden = true;
+    if (autoFocus) guessInput.focus();
+  }
+
+  function showOptions(): void {
+    if (answered) return;
+    optionsEl.hidden = false;
+    answerForm.hidden = true;
+    optionBtns[0].focus();
+  }
+
+  function answer(picked: Language, route: 'typed' | 'options'): void {
+    if (!question || answered) return;
+    answered = true;
+    const { language } = question;
+    const correct = picked.id === language.id;
+
+    guessInput.disabled = true;
+    revealBtn.disabled = true;
+    answerForm.hidden = true;
+
+    if (route === 'options') {
+      optionsEl.hidden = false;
+      optionBtns.forEach(btn => {
+        btn.disabled = true;
+        if (btn.dataset.languageId === language.id) btn.classList.add('is-correct');
+        else if (btn.dataset.languageId === picked.id) btn.classList.add('is-wrong');
+        else btn.classList.add('is-muted');
+      });
+    }
+
+    sentenceEl.lang = language.bcp47;
+
+    // Catalogue the specimen.
+    lbName.textContent = language.name;
+    lbTag.textContent = language.bcp47;
+    lbFamily.textContent = language.family === 'Isolate' ? 'Isolate — no known relatives' : language.family;
+    lbScript.textContent = language.script;
+    lbGloss.textContent = source === 'custom'
+      ? customSentence
+      : fill(SENTENCE_GLOSSES[question.sentenceIndex]);
+    lbTell.textContent = language.tell;
+    labelEl.hidden = false;
+
+    verdictEl.textContent = correct
+      ? 'Correct'
+      : route === 'typed'
+        ? `Not quite — you said ${picked.name}`
+        : 'Not quite';
+    verdictEl.className = correct ? 'verdict is-correct' : 'verdict is-wrong';
+    verdictRow.hidden = false;
+    nextBtn.focus();
+  }
+
+  function submitGuess(): void {
+    if (answered) return;
+    const raw = guessInput.value.trim();
+    if (!raw) return;
+    const { language, ambiguous } = matchGuess(raw);
+    if (!language) {
+      hintEl.textContent = ambiguous
+        ? `"${raw}" is close to more than one language — try the full name.`
+        : `No language here is called "${raw}". Check the spelling, or show the options.`;
+      hintEl.classList.add('is-error');
+      guessInput.select();
+      return;
+    }
+    answer(language, 'typed');
+  }
+
+  // ── Source switch ────────────────────────────────────────────────────────
+  async function setSource(next: Source, fresh = true): Promise<void> {
+    source = next;
+    const custom = source === 'custom';
+    randomBtn.classList.toggle('is-active', !custom);
+    customBtn.classList.toggle('is-active', custom);
+    randomBtn.setAttribute('aria-pressed', String(!custom));
+    customBtn.setAttribute('aria-pressed', String(custom));
+    customEl.hidden = !custom;
+    savePrefs();
+
+    if (custom) {
+      customStatus.classList.remove('is-error');
+      customStatus.textContent = 'Checking which languages your browser can translate…';
+      const found = await probeTranslatable();
+      if (found.size === 0) {
+        customStatus.textContent = 'Your browser has no on-device translation available.';
+        customStatus.classList.add('is-error');
+      } else {
+        customStatus.textContent = customStatusLine();
+      }
+    }
+    if (fresh) askQuestion();
+  }
+
+  // ── Wiring ───────────────────────────────────────────────────────────────
+  randomBtn.addEventListener('click', () => void setSource('random'));
+  customBtn.addEventListener('click', () => void setSource('custom'));
+
+  let customDebounce = 0;
+  customText.addEventListener('input', () => {
+    customSentence = customText.value.trim();
+    savePrefs();
+    window.clearTimeout(customDebounce);
+    // Wait for a pause in typing before spending a translation on it.
+    customDebounce = window.setTimeout(() => {
+      if (source === 'custom' && customSentence) askQuestion();
+    }, 600);
+  });
+
+  answerForm.addEventListener('submit', event => {
+    event.preventDefault();
+    submitGuess();
+  });
+
+  guessInput.addEventListener('input', () => {
+    if (hintEl.classList.contains('is-error')) {
+      hintEl.textContent = DEFAULT_HINT;
+      hintEl.classList.remove('is-error');
+    }
+  });
+
+  revealBtn.addEventListener('click', showOptions);
+
+  optionBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const option = question?.options.find(o => o.id === btn.dataset.languageId);
+      if (option) answer(option, 'options');
+    });
+  });
+
+  nextBtn.addEventListener('click', askQuestion);
+
+  document.addEventListener('keydown', event => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.isContentEditable)) return;
+
+    if (event.key >= '1' && event.key <= String(OPTION_COUNT) && !optionsEl.hidden && !answered) {
+      const option = question?.options[Number(event.key) - 1];
+      if (option) {
+        event.preventDefault();
+        answer(option, 'options');
+      }
+      return;
+    }
+    if (event.key === 'Enter' && !verdictRow.hidden) {
+      event.preventDefault();
+      askQuestion();
+    }
+  });
+
+  // ── Start ────────────────────────────────────────────────────────────────
+  customBtn.hidden = !translatorApi;
+  // With nothing to switch to, the switch itself is just noise.
+  el<HTMLElement>('sources').hidden = !translatorApi;
+  loadPrefs();
+  if (source === 'custom' && !translatorApi) source = 'random';
+  customText.value = customSentence;
+  hintEl.textContent = DEFAULT_HINT;
+  void setSource(source, true);
+</script>
