@@ -182,14 +182,13 @@ function focusWin(win) {
   syncBrowserItem();
 }
 
-/* The dock's browser item always reflects the window currently on top. */
+/* The left dock item is always Home; it never represents an open window. */
 function syncBrowserItem() {
   if (!dockBrowserLabel) return;
-  const live = activeWin && wins.has(activeWin.id) && !activeWin.minimised ? activeWin : null;
-  dockBrowserLabel.textContent = live ? live.title : 'oliverdelange';
-  dockBrowser.classList.toggle('is-live', Boolean(live));
-  dockBrowser.setAttribute('aria-label', 'Show desktop');
-  dockBrowser.title = 'Show desktop';
+  dockBrowserLabel.textContent = 'Home';
+  dockBrowser.classList.remove('is-live');
+  dockBrowser.setAttribute('aria-label', 'Home');
+  dockBrowser.title = 'Home';
 }
 
 /* ── window construction ───────────────────────────────────── */
@@ -338,6 +337,7 @@ function showDesktop() {
   activeWin = null;
   if (changed) syncDock();
   syncBrowserItem();
+  if (!changed) toast('You’re already viewing the desktop');
   history.pushState({}, '', '/');
   document.title = 'oliverdelange';
 }
@@ -582,6 +582,7 @@ function openTrash() {
 
 function iconMeta(id) {
   if (id === 'blog') return { id: 'blog', name: 'Blog', icon: 'folder' };
+  if (id === 'settings') return { id: 'settings', name: 'Settings', icon: 'settings' };
   if (id === 'github') return { id: 'github', name: 'GitHub', icon: 'github' };
   if (id === 'linkedin') return { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin' };
   const p = data.projects.find(x => x.id === id);
@@ -613,11 +614,12 @@ function layoutIcons() {
   const colW = 104, rowH = 92, pad = 12;
   const perCol = Math.max(1, Math.floor((h - pad) / rowH));
 
-  // Flow icons fill columns from the top-left; corner="tr" pins stack
-  // down from the top-right so socials stay reachable on a phone.
+  // Flow icons fill columns from the top-left; corner pins keep shortcuts
+  // at their intended desktop edge.
   const all = [...iconLayer.querySelectorAll('.desk-icon')];
-  const flow = all.filter(el => el.dataset.corner !== 'tr');
+  const flow = all.filter(el => !el.dataset.corner);
   const trPins = all.filter(el => el.dataset.corner === 'tr');
+  const brPins = all.filter(el => el.dataset.corner === 'br');
 
   flow.forEach((el, i) => {
     const id = el.dataset.id;
@@ -644,6 +646,19 @@ function layoutIcons() {
       el.style.top = (pad + i * rowH) + 'px';
     }
   });
+
+  brPins.forEach((el, i) => {
+    const id = el.dataset.id;
+    const pos = saved[id];
+    if (pos) {
+      el.style.left = clamp(pos.x, 0, Math.max(0, w - iconW(el))) + 'px';
+      el.style.top = clamp(pos.y, 0, Math.max(0, h - rowH)) + 'px';
+    } else {
+      // Keep the icon above the dock while retaining a bottom-right anchor.
+      el.style.left = Math.max(0, w - iconW(el) - pad) + 'px';
+      el.style.top = Math.max(pad, h - rowH - 80 - i * rowH) + 'px';
+    }
+  });
 }
 
 function persistIcons() {
@@ -665,6 +680,7 @@ function activateIcon(el) {
   }
   const id = el.dataset.id;
   if (id === 'blog') return openBlogFolder();
+  if (id === 'settings') return openSettings();
   const project = data.projects.find(p => p.id === id);
   if (project) openProject(project);
 }
@@ -996,6 +1012,7 @@ document.getElementById('ctx-cleanup')?.addEventListener('click', () => {
 /* ── Apple menu: About, Settings, Lock ─────────────────────── */
 
 const THEMES = ['light', 'dark', 'system'];
+const DISPLAY_SCALES = ['small', 'normal', 'large'];
 
 function currentTheme() {
   const saved = store.read('odl-theme', 'system');
@@ -1006,6 +1023,17 @@ function applyTheme(mode) {
   if (mode === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', mode);
   store.write('odl-theme', mode);
+}
+
+function currentDisplayScale() {
+  // Preserve the choice made before this preference was renamed from Text size.
+  const saved = store.read('odl-display-scale', store.read('odl-font-scale', 'normal'));
+  return DISPLAY_SCALES.includes(saved) ? saved : 'normal';
+}
+
+function applyDisplayScale(scale) {
+  root.setAttribute('data-display-scale', scale);
+  store.write('odl-display-scale', scale);
 }
 
 function openAbout() {
@@ -1039,8 +1067,11 @@ function openSettings() {
     <h3 class="settings-heading">Appearance</h3>
     <p class="settings-hint">Choose how the desktop looks.</p>
     <div class="settings-options" role="radiogroup" aria-label="Appearance"></div>
+    <h3 class="settings-heading settings-heading--spaced">Display</h3>
+    <p class="settings-hint">Choose the overall scale of the desktop.</p>
+    <div class="settings-options" role="radiogroup" aria-label="Display scale"></div>
   `;
-  const group = node.querySelector('.settings-options');
+  const [themeGroup, fontScaleGroup] = node.querySelectorAll('.settings-options');
   const labels = { light: 'Light', dark: 'Dark', system: 'Use system setting' };
 
   THEMES.forEach(mode => {
@@ -1058,12 +1089,31 @@ function openSettings() {
     const span = document.createElement('span');
     span.textContent = labels[mode];
     row.append(input, span);
-    group.appendChild(row);
+    themeGroup.appendChild(row);
+  });
+
+  const displayScaleLabels = { small: 'Small', normal: 'Normal', large: 'Large' };
+  DISPLAY_SCALES.forEach(scale => {
+    const id = 'display-scale-' + scale;
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    row.setAttribute('for', id);
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'odl-display-scale';
+    input.id = id;
+    input.value = scale;
+    input.checked = currentDisplayScale() === scale;
+    input.addEventListener('change', () => { if (input.checked) applyDisplayScale(scale); });
+    const span = document.createElement('span');
+    span.textContent = displayScaleLabels[scale];
+    row.append(input, span);
+    fontScaleGroup.appendChild(row);
   });
 
   openWindow({
     id: 'settings', title: 'Settings', kind: 'folder',
-    icon: 'monogram', node, size: { w: 400, h: 300 },
+    icon: 'monogram', node, size: { w: 400, h: 360 },
   });
 }
 

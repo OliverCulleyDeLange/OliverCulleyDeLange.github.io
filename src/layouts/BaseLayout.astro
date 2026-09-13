@@ -97,7 +97,7 @@ const socialIcons = [
 
 /* Every glyph the script may need to clone at runtime. */
 const iconNames = [...new Set([
-  ...deskIcons.map(i => i.icon), 'app', 'doc', 'folder', 'monogram',
+  ...deskIcons.map(i => i.icon), 'app', 'doc', 'folder', 'settings', 'monogram',
   ...socialIcons.map(i => i.icon),
 ])];
 ---
@@ -118,6 +118,15 @@ const iconNames = [...new Set([
         var saved = JSON.parse(localStorage.getItem('odl-theme'));
         if (saved === 'light' || saved === 'dark') {
           document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) {}
+      try {
+        var displayScale = JSON.parse(localStorage.getItem('odl-display-scale'));
+        if (displayScale !== 'small' && displayScale !== 'normal' && displayScale !== 'large') {
+          displayScale = JSON.parse(localStorage.getItem('odl-font-scale'));
+        }
+        if (displayScale === 'small' || displayScale === 'normal' || displayScale === 'large') {
+          document.documentElement.setAttribute('data-display-scale', displayScale);
         }
       } catch (e) {}
       {isDesktopShell && `
@@ -264,6 +273,10 @@ const iconNames = [...new Set([
           <MacIcon name="folder" size={32} />
           <span class="desk-label">Blog</span>
         </li>
+        <li class="desk-icon" data-id="settings" data-corner="br" tabindex="0" role="button" aria-label="Open Settings">
+          <MacIcon name="settings" size={32} />
+          <span class="desk-label">Settings</span>
+        </li>
         {socialIcons.map(item => (
           <li class="desk-icon" data-id={item.id} data-href={item.href} data-corner="tr"
               tabindex="0" role="link" aria-label={`Open ${item.name}`}>
@@ -276,9 +289,9 @@ const iconNames = [...new Set([
     </div>}
 
     {isDesktopShell && <div class="dock" id="dock" hidden>
-      <button class="dock-item dock-browser" id="dock-browser" type="button" aria-label="Current window">
+      <button class="dock-item dock-browser" id="dock-browser" type="button" aria-label="Home">
         <MacIcon name="monogram" size={28} />
-        <span class="dock-label" id="dock-browser-label">oliverdelange</span>
+        <span class="dock-label" id="dock-browser-label">Home</span>
       </button>
       <div class="dock-sep"></div>
       <div class="dock-items" id="dock-items"></div>

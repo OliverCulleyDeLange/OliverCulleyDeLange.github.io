@@ -37,7 +37,10 @@
   --border: var(--ink);
 
   --max-width: 760px;
-  --menubar-height: 22px;
+  /* Normal is the default display scale. */
+  --display-scale: 1.125;
+  --menubar-height: calc(22px * var(--display-scale));
+  --titlebar-height: calc(19px * var(--display-scale));
 
   --font-ui: 'Chicago', 'ChiKareGo2', Geneva, Verdana, sans-serif;
   --font-body: Geneva, Verdana, Tahoma, 'DejaVu Sans', sans-serif;
@@ -97,8 +100,25 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 18px;
   background: var(--desktop);
+}
+
+/* The preference lives on the root so pages, windows, icons, and desktop
+   chrome stay in step. */
+html[data-display-scale='small'] {
+  font-size: 16px;
+  --display-scale: 1;
+}
+
+html[data-display-scale='normal'] {
+  font-size: 18px;
+  --display-scale: 1.125;
+}
+
+html[data-display-scale='large'] {
+  font-size: 20px;
+  --display-scale: 1.25;
 }
 
 /* The desktop: authentic 50% dither pattern */
@@ -386,17 +406,9 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  height: 19px;
+  height: var(--titlebar-height);
   padding: 0 4px;
   border-bottom: 1px solid var(--ink);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--ink) 0 1px,
-    var(--paper) 1px 3px
-  );
-  background-size: 100% 15px;
-  background-position: 0 2px;
-  background-repeat: no-repeat;
   user-select: none;
 }
 
@@ -1266,6 +1278,12 @@ html.desktop-on body {
   text-align: center;
 }
 
+/* Scale the artwork without changing the desktop grid coordinates. */
+.desk-icon > .mac-icon {
+  width: calc(32px * var(--display-scale));
+  height: calc(32px * var(--display-scale));
+}
+
 .desk-icon .desk-label {
   font-family: var(--font-ui);
   -webkit-font-smoothing: none;
@@ -1277,6 +1295,10 @@ html.desktop-on body {
   color: var(--ink);
   max-width: 100%;
   overflow-wrap: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .desk-icon:hover .desk-label,
@@ -1324,23 +1346,12 @@ html.desktop-on body {
   align-items: center;
   gap: 0.35rem;
   flex: none;
-  height: 19px;
+  height: var(--titlebar-height);
   padding: 0 4px;
   border-bottom: 1px solid var(--ink);
   cursor: default;
   touch-action: none;
   user-select: none;
-}
-
-.win.is-active .win-bar {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--ink) 0 1px,
-    var(--paper) 1px 3px
-  );
-  background-size: 100% 15px;
-  background-position: 0 2px;
-  background-repeat: no-repeat;
 }
 
 .win-title {
@@ -1919,6 +1930,10 @@ html.is-framed .window-body {
   margin-bottom: 0.2rem;
 }
 
+.settings-heading--spaced {
+  margin-top: 1.35rem;
+}
+
 .settings-hint {
   color: var(--grey);
   font-size: 0.9375rem;
@@ -1927,8 +1942,8 @@ html.is-framed .window-body {
 
 .settings-options {
   display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
 }
 
 .settings-row {
@@ -2092,7 +2107,7 @@ html.is-locked body {
 /* On touch, the macOS-sized lights are far too small to hit reliably. */
 @media (pointer: coarse) {
   .win-bar {
-    height: 28px;
+    height: calc(28px * var(--display-scale));
     gap: 0.5rem;
   }
 
