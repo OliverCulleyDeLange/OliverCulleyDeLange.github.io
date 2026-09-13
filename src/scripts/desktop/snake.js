@@ -5,6 +5,7 @@
 const SPEED_STORAGE_KEY = 'odl-ambient-snake-speed';
 const ENABLED_STORAGE_KEY = 'odl-ambient-snake';
 const SPEEDS = { disabled: 0, slow: 190, normal: 115, fast: 65 };
+const SPEED_MULTIPLIERS = { disabled: 0, slow: 1, normal: 2, fast: 3 };
 const CELL_SIZE = 13;
 const DIRECTIONS = {
   ArrowUp: { x: 0, y: -1 },
@@ -43,6 +44,8 @@ export function createAmbientSnake(canvas) {
   let food = { x: 0, y: 0 };
   let playerControlled = false;
   let speed = readSpeed();
+  let foodEaten = 0;
+  const heldArrowKeys = new Set();
   let lastStep = 0;
   let animationFrame = null;
 
@@ -77,6 +80,7 @@ export function createAmbientSnake(canvas) {
     snake = [center, { x: center.x - 1, y: center.y }, { x: center.x - 2, y: center.y }];
     direction = DIRECTIONS.ArrowRight;
     food = randomOpenCell();
+    foodEaten = 0;
   }
 
   function nextCell(from, movement) {
@@ -115,8 +119,10 @@ export function createAmbientSnake(canvas) {
       return;
     }
     snake.unshift(head);
-    if (sameCell(head, food)) food = randomOpenCell();
-    else snake.pop();
+    if (sameCell(head, food)) {
+      foodEaten += 1;
+      food = randomOpenCell();
+    } else snake.pop();
   }
 
   function colours() {
@@ -151,7 +157,10 @@ export function createAmbientSnake(canvas) {
   }
 
   function tick(time) {
-    if (isEnabled() && time - lastStep >= SPEEDS[speed]) {
+    const foodSpeed = Math.pow(1 + SPEED_MULTIPLIERS[speed] / 100, foodEaten);
+    const heldKeySpeed = heldArrowKeys.size ? 2 : 1;
+    const stepInterval = SPEEDS[speed] / foodSpeed / heldKeySpeed;
+    if (isEnabled() && time - lastStep >= stepInterval) {
       step();
       lastStep = time;
     }
@@ -165,7 +174,16 @@ export function createAmbientSnake(canvas) {
     const reversing = movement.x === -direction.x && movement.y === -direction.y;
     if (!reversing) direction = movement;
     playerControlled = true;
+    heldArrowKeys.add(event.key);
     event.preventDefault();
+  }
+
+  function onKeyup(event) {
+    if (DIRECTIONS[event.key]) heldArrowKeys.delete(event.key);
+  }
+
+  function onWindowBlur() {
+    heldArrowKeys.clear();
   }
 
   function setSpeed(nextSpeed) {
@@ -181,7 +199,9 @@ export function createAmbientSnake(canvas) {
   }
 
   window.addEventListener('resize', resize);
+  window.addEventListener('blur', onWindowBlur);
   document.addEventListener('keydown', onKeydown);
+  document.addEventListener('keyup', onKeyup);
   canvas.hidden = !isEnabled();
   resize();
   animationFrame = requestAnimationFrame(tick);
@@ -192,7 +212,9 @@ export function createAmbientSnake(canvas) {
     refresh: resize,
     destroy() {
       window.removeEventListener('resize', resize);
+      window.removeEventListener('blur', onWindowBlur);
       document.removeEventListener('keydown', onKeydown);
+      document.removeEventListener('keyup', onKeyup);
       if (animationFrame) cancelAnimationFrame(animationFrame);
     },
   };
