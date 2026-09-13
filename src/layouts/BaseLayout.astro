@@ -1,12 +1,92 @@
 ---
+import { getCollection } from 'astro:content';
+import MacIcon from '../components/MacIcon.astro';
+import { iconFor } from '../lib/project-icons';
+
 interface Props {
   title?: string;
   description?: string;
+  windowTitle?: string;
+  wide?: boolean;
 }
 
-const { title, description = "A blog I probably won't keep up to date" } = Astro.props;
-const siteTitle = "oliverdelange";
+const {
+  title,
+  description = "A blog I probably won't keep up to date",
+  windowTitle,
+  wide = false,
+} = Astro.props;
+
+const siteTitle = 'oliverdelange';
 const pageTitle = title ? `${title} | ${siteTitle}` : siteTitle;
+const barTitle = windowTitle ?? title ?? siteTitle;
+
+const projects = (await getCollection('projects')).sort(
+  (a, b) => (a.data.order ?? 99) - (b.data.order ?? 99)
+);
+
+const allPosts = await getCollection('posts');
+const postById = new Map(allPosts.map(post => [post.id, post]));
+const byDateDesc = (a, b) => b.data.date.valueOf() - a.data.date.valueOf();
+
+/* Projects menu launches the deployed app when there is one. */
+const projectHref = (project: (typeof projects)[number]) => {
+  const { appUrl, relatedPosts = [] } = project.data;
+  if (appUrl) return appUrl;
+  return relatedPosts.length === 1
+    ? `/posts/${relatedPosts[0]}/`
+    : `/projects/${project.id}/`;
+};
+const isExternal = (href: string) => /^https?:\/\//.test(href);
+
+/* Blog menu is tiered: a submenu per project that has more than one post. */
+const claimed = new Set<string>();
+const blogGroups = projects
+  .map(project => {
+    const posts = (project.data.relatedPosts ?? [])
+      .map(id => postById.get(id))
+      .filter((post): post is NonNullable<typeof post> => Boolean(post))
+      .sort(byDateDesc);
+    posts.forEach(post => claimed.add(post.id));
+    return { project, posts };
+  })
+  .filter(group => group.posts.length > 0);
+
+/* Anything not attached to a project sits below a divider. */
+const looseposts = allPosts.filter(post => !claimed.has(post.id)).sort(byDateDesc);
+
+/* ── Desktop ──
+   Icons are server-rendered so they are real links for crawlers and for
+   anyone without JS; desktop.js takes them over and makes them draggable. */
+const deskIcons = projects.map(project => ({
+  id: project.id,
+  name: project.data.name,
+  icon: iconFor(project.id),
+  href: `/projects/${project.id}/`,
+}));
+
+/* Everything the window manager needs, as plain JSON. */
+const desktopData = {
+  projects: projects.map(project => ({
+    id: project.id,
+    name: project.data.name,
+    tagline: project.data.tagline,
+    appUrl: project.data.appUrl ?? null,
+    icon: iconFor(project.id),
+  })),
+  posts: allPosts.sort(byDateDesc).map(post => ({
+    id: post.id,
+    title: post.data.title,
+    date: post.data.date.toLocaleDateString('en-GB', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    }),
+  })),
+};
+
+/* Every glyph the script may need to clone at runtime. */
+const iconNames = [...new Set([
+  ...deskIcons.map(i => i.icon), 'app', 'doc', 'folder', 'monogram',
+])];
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -14,28 +94,281 @@ const pageTitle = title ? `${title} | ${siteTitle}` : siteTitle;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)" />
     <title>{pageTitle}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/ChiKareGo2.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/styles/global.css" />
+    <script is:inline>
+      try {
+        var saved = JSON.parse(localStorage.getItem('odl-theme'));
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) {}
+      /* Avoid a flash of the plain page before the desktop mounts.
+         The timeout is a safety net: if the script fails, content comes back. */
+      document.documentElement.classList.add('desktop-boot');
+      setTimeout(function () {
+        document.documentElement.classList.remove('desktop-boot');
+      }, 4000);
+    </script>
     <script data-goatcounter="https://ocd.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   </head>
   <body>
-    <header>
-      <nav>
-        <a href="/" class="site-title">{siteTitle}</a>
-        <div class="nav-links">
-          <a href="/cv/">cv</a>
+    <div class="boot-screen" id="boot-screen" hidden>
+      <MacIcon name="happymac" size={128} class="boot-mac" />
+      <p class="boot-caption">Welcome to oliverdelange</p>
+    </div>
+    <script is:inline>
+      (function () {
+        try {
+          var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (reduced || localStorage.getItem('odl-booted')) return;
+          var el = document.getElementById('boot-screen');
+          if (!el) return;
+          localStorage.setItem('odl-booted', '1');
+          el.hidden = false;
+          document.documentElement.classList.add('booting');
+          var finish = function () {
+            el.classList.add('leaving');
+            document.documentElement.classList.remove('booting');
+            setTimeout(function () { el.remove(); }, 220);
+          };
+          var timer = setTimeout(finish, 1600);
+          var skip = function () { clearTimeout(timer); finish(); };
+          el.addEventListener('click', skip, { once: true });
+          window.addEventListener('keydown', skip, { once: true });
+        } catch (e) {}
+      })();
+    </script>
+
+    <nav class="menu-bar" aria-label="Main">
+      <ul>
+        <li class="menu-item menu-item-logo" tabindex="0">
+          <span class="menu-label" aria-label="Apple menu">
+            <MacIcon name="monogram" size={15} class="monogram" />
+          </span>
+          <ul class="menu-dropdown">
+            <li><button type="button" id="menu-about">About This Site…</button></li>
+            <li class="divider" role="separator"></li>
+            <li>
+              <button type="button" id="menu-settings">
+                <span>Settings…</span><span class="menu-shortcut" aria-hidden="true">,</span>
+              </button>
+            </li>
+            <li><button type="button" id="menu-lock">Lock Screen</button></li>
+          </ul>
+        </li>
+        <li class="menu-item" tabindex="0">
+          <span class="menu-label">File</span>
+          <ul class="menu-dropdown">
+            <li>
+              <a href="/"><span>Home</span><span class="menu-shortcut" aria-hidden="true">H</span></a>
+            </li>
+            <li>
+              <button type="button" id="menu-share">
+                <span>Share</span><span class="menu-shortcut" aria-hidden="true">S</span>
+              </button>
+            </li>
+            <li class="divider" role="separator"></li>
+            <li>
+              <button type="button" id="menu-quit">
+                <span>Quit</span><span class="menu-shortcut" aria-hidden="true">Q</span>
+              </button>
+            </li>
+          </ul>
+        </li>
+        <li class="menu-item" tabindex="0">
+          <span class="menu-label">Projects</span>
+          <ul class="menu-dropdown">
+            {projects.map(project => {
+              const href = projectHref(project);
+              const ext = isExternal(href);
+              return (
+                <li>
+                  <a
+                    href={href}
+                    target={ext ? '_blank' : undefined}
+                    rel={ext ? 'noopener' : undefined}
+                  >{project.data.name}</a>
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+        <li class="menu-item" tabindex="0">
+          <span class="menu-label">Blog</span>
+          <ul class="menu-dropdown">
+            {blogGroups.map(({ project, posts }) => (
+              posts.length > 1 ? (
+                <li class="has-submenu" tabindex="0">
+                  <span class="submenu-label">{project.data.name}</span>
+                  <ul class="submenu">
+                    {posts.map(post => (
+                      <li><a href={`/posts/${post.id}/`}>{post.data.title}</a></li>
+                    ))}
+                  </ul>
+                </li>
+              ) : (
+                <li><a href={`/posts/${posts[0].id}/`}>{project.data.name}</a></li>
+              )
+            ))}
+            {looseposts.length > 0 && <li class="divider" role="separator"></li>}
+            {looseposts.map(post => (
+              <li><a href={`/posts/${post.id}/`}>{post.data.title}</a></li>
+            ))}
+          </ul>
+        </li>
+        <li class="menu-item" tabindex="0">
+          <span class="menu-label">Socials</span>
+          <ul class="menu-dropdown">
+            <li><a href="https://github.com/OliverCulleyDeLange" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://www.linkedin.com/in/oliverdelange" target="_blank" rel="noopener">LinkedIn</a></li>
+          </ul>
+        </li>
+      </ul>
+      <div class="menu-right">
+        <span class="menu-clock">
+          <span class="menu-date" id="menu-date"></span>
+          <span class="menu-time" id="menu-time"></span>
+        </span>
+      </div>
+    </nav>
+
+    <div class="desktop" id="desktop" hidden>
+      <ul class="desk-icons" id="desk-icons">
+        {deskIcons.map(item => (
+          <li class="desk-icon" data-id={item.id} tabindex="0" role="button" aria-label={`Open ${item.name}`}>
+            <MacIcon name={item.icon as any} size={32} />
+            <span class="desk-label">{item.name}</span>
+          </li>
+        ))}
+        <li class="desk-icon" data-id="blog" tabindex="0" role="button" aria-label="Open Blog">
+          <MacIcon name="folder" size={32} />
+          <span class="desk-label">Blog</span>
+        </li>
+      </ul>
+      <div class="win-layer" id="win-layer"></div>
+    </div>
+
+    <div class="dock" id="dock" hidden>
+      <button class="dock-item dock-browser" id="dock-browser" type="button" aria-label="Current window">
+        <MacIcon name="monogram" size={28} />
+        <span class="dock-label" id="dock-browser-label">oliverdelange</span>
+      </button>
+      <div class="dock-sep"></div>
+      <div class="dock-items" id="dock-items"></div>
+      <div class="dock-sep dock-sep-min"></div>
+      <button class="dock-item dock-trash" id="dock-trash" type="button" aria-label="Trash">
+        <svg class="mac-icon" width="28" height="28" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+          <path d="M4 5h8v9H4z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+          <path d="M3 4h10M6 3h4" stroke="currentColor" stroke-width="1"/>
+          <path d="M6.5 7v5M9.5 7v5" stroke="currentColor" stroke-width="1"/>
+        </svg>
+        <span class="dock-label">Trash</span>
+      </button>
+    </div>
+
+    <div class="lock-screen" id="lock-screen" hidden>
+      <div class="lock-inner">
+        <MacIcon name="monogram" size={64} />
+        <p class="lock-name">oliverdelange</p>
+        <form class="lock-form" id="lock-form">
+          <input type="password" id="lock-pass" name="lock-pass" placeholder="Password"
+                 autocomplete="off" aria-label="Password" />
+          <button type="submit" class="btn btn-primary btn-sm">Log In</button>
+        </form>
+        <p class="lock-error" id="lock-error" hidden>Incorrect password.</p>
+        <button type="button" class="lock-forgot" id="lock-forgot">Forgot my password?</button>
+      </div>
+
+      <div class="dialog lock-dialog" id="lock-dialog" hidden role="alertdialog" aria-live="assertive">
+        <div class="dialog-inner">
+          <div class="dialog-body">
+            <MacIcon name="bomb" size={36} />
+            <div class="dialog-text">
+              <p>you muppet</p>
+              <p class="lock-dialog-note">Letting you back in anyway&hellip;</p>
+            </div>
+          </div>
         </div>
-      </nav>
-    </header>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <div class="dialog dock-hint" id="dock-hint" hidden role="alertdialog" aria-live="polite">
+      <div class="dialog-inner">
+        <div class="dialog-body">
+          <MacIcon name="monogram" size={36} />
+          <div class="dialog-text">
+            <p>You can double tap to close.</p>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="dock-hint-ok">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="context-menu" id="context-menu" hidden role="menu">
+      <li role="none">
+        <button type="button" id="ctx-cleanup" role="menuitem">Clean Up Desktop</button>
+      </li>
+    </ul>
+
+    <div id="icon-templates" hidden>
+      {iconNames.map(name => (
+        <template data-icon={name}><MacIcon name={name as any} size={32} /></template>
+      ))}
+    </div>
+
+    <script type="application/json" id="desktop-data" set:html={JSON.stringify(desktopData)}></script>
+
     <main>
-      <slot />
+      <div class:list={['window', wide && 'window-wide']}>
+        <div class="title-bar">
+          <button class="box close" type="button" aria-label="Close (go home)" onclick="location.href='/'"></button>
+          <h2 class="title">{barTitle}</h2>
+          <span class="box zoom" aria-hidden="true"></span>
+        </div>
+        <div class="window-body">
+          <slot />
+        </div>
+        <div class="status-bar">
+          <span>oliverdelange.co.uk</span>
+          <span>
+            <a href="https://github.com/OliverCulleyDeLange" target="_blank" rel="noopener">GitHub</a>
+            &nbsp;&middot;&nbsp;
+            <a href="https://www.linkedin.com/in/oliverdelange" target="_blank" rel="noopener">LinkedIn</a>
+          </span>
+        </div>
+      </div>
     </main>
-    <footer>
-      <p>
-        <a href="https://github.com/OliverCulleyDeLange" target="_blank" rel="noopener">GitHub</a>
-        &middot;
-        <a href="https://www.linkedin.com/in/oliverdelange" target="_blank" rel="noopener">LinkedIn</a>
-      </p>
-    </footer>
+
+    <script>
+      import '../scripts/desktop.js';
+    </script>
+
+    <script is:inline>
+      (function () {
+        var dateEl = document.getElementById('menu-date');
+        var timeEl = document.getElementById('menu-time');
+        if (!dateEl || !timeEl) return;
+        var tick = function () {
+          var now = new Date();
+          dateEl.textContent = now.toLocaleDateString('en-GB', {
+            weekday: 'short', day: 'numeric', month: 'short',
+          });
+          timeEl.textContent = now.toLocaleTimeString('en-GB', {
+            hour: 'numeric', minute: '2-digit',
+          });
+        };
+        tick();
+        setInterval(tick, 20000);
+      })();
+    </script>
   </body>
 </html>
