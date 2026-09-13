@@ -129,15 +129,15 @@ const iconNames = [...new Set([
           document.documentElement.setAttribute('data-display-scale', displayScale);
         }
       } catch (e) {}
-      {isDesktopShell && `
-        /* Avoid a flash of the plain page before the desktop mounts.
-           The timeout is a safety net: if the script fails, content comes back. */
-        document.documentElement.classList.add('desktop-boot');
-        setTimeout(function () {
-          document.documentElement.classList.remove('desktop-boot');
-        }, 4000);
-      `}
     </script>
+    {isDesktopShell && <script is:inline>
+      /* Avoid a flash of the plain page before the desktop mounts.
+         The timeout is a safety net: if the script fails, content comes back. */
+      document.documentElement.classList.add('desktop-boot');
+      setTimeout(function () {
+        document.documentElement.classList.remove('desktop-boot');
+      }, 4000);
+    </script>}
     <script data-goatcounter="https://ocd.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   </head>
   <body class:list={[!isDesktopShell && 'standalone-page']}>
@@ -262,6 +262,7 @@ const iconNames = [...new Set([
     </nav>}
 
     {isDesktopShell && <div class="desktop" id="desktop" hidden>
+      <canvas class="ambient-snake" id="ambient-snake" aria-label="Ambient Snake game. It plays itself until you use the arrow keys."></canvas>
       <ul class="desk-icons" id="desk-icons">
         {deskIcons.map(item => (
           <li class="desk-icon" data-id={item.id} tabindex="0" role="button" aria-label={`Open ${item.name}`}>

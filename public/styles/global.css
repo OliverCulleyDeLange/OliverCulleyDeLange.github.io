@@ -1251,6 +1251,21 @@ html.desktop-on body {
   overflow: hidden;
 }
 
+/* Decorative, but real: the canvas stays beneath icons and windows so it
+   never steals pointer input from the desktop. */
+.ambient-snake {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.78;
+}
+
+.ambient-snake[hidden] {
+  display: none;
+}
+
 /* ── Desktop icons ── */
 .desk-icons {
   position: absolute;

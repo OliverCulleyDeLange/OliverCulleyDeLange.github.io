@@ -6,6 +6,8 @@
    so if the script never runs you still get the plain page.
    ═══════════════════════════════════════════════════════════════ */
 
+import { createAmbientSnake } from './desktop/snake.js';
+
 const root = document.documentElement;
 const MOBILE = () => window.innerWidth < 700;
 
@@ -45,6 +47,7 @@ const dockItems = document.getElementById('dock-items');
 const dockTrash = document.getElementById('dock-trash');
 const dockBrowser = document.getElementById('dock-browser');
 const dockBrowserLabel = document.getElementById('dock-browser-label');
+const ambientSnake = createAmbientSnake(document.getElementById('ambient-snake'));
 if (!desktop || !winLayer || !dock) throw new Error('desktop markup missing');
 
 const wins = new Map();
@@ -1011,6 +1014,9 @@ function boot() {
   dock.hidden = false;
   root.classList.add('desktop-on');
   root.classList.remove('desktop-boot');
+  // The game canvas was constructed while its desktop parent was hidden.
+  // Measure it again now that CSS has given it its real dimensions.
+  ambientSnake.refresh();
 
   applyTrash();
   layoutIcons();
@@ -1176,8 +1182,11 @@ function openSettings(opts = {}) {
     <h3 class="settings-heading settings-heading--spaced">Display</h3>
     <p class="settings-hint">Choose the overall scale of the desktop.</p>
     <div class="settings-options" role="radiogroup" aria-label="Display scale"></div>
+    <h3 class="settings-heading settings-heading--spaced">Snake speed</h3>
+    <p class="settings-hint">It plays behind your windows. Arrow keys take control.</p>
+    <div class="settings-options" role="radiogroup" aria-label="Snake speed"></div>
   `;
-  const [themeGroup, fontScaleGroup] = node.querySelectorAll('.settings-options');
+  const [themeGroup, fontScaleGroup, snakeSpeedGroup] = node.querySelectorAll('.settings-options');
   const labels = { light: 'Light', dark: 'Dark', system: 'Use system setting' };
 
   THEMES.forEach(mode => {
@@ -1217,9 +1226,28 @@ function openSettings(opts = {}) {
     fontScaleGroup.appendChild(row);
   });
 
+  const snakeSpeedLabels = { disabled: 'Disabled', slow: 'Slow', normal: 'Normal', fast: 'Fast' };
+  Object.entries(snakeSpeedLabels).forEach(([speed, label]) => {
+    const id = 'ambient-snake-speed-' + speed;
+    const row = document.createElement('label');
+    row.className = 'settings-row';
+    row.setAttribute('for', id);
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'odl-ambient-snake-speed';
+    input.id = id;
+    input.value = speed;
+    input.checked = ambientSnake.currentSpeed() === speed;
+    input.addEventListener('change', () => { if (input.checked) ambientSnake.setSpeed(speed); });
+    const text = document.createElement('span');
+    text.textContent = label;
+    row.append(input, text);
+    snakeSpeedGroup.appendChild(row);
+  });
+
   openWindow({
     id: 'settings', title: 'Settings', kind: 'folder',
-    icon: 'monogram', node, size: { w: 400, h: 360 }, rect: opts.rect,
+    icon: 'monogram', node, size: { w: 400, h: 440 }, rect: opts.rect,
   });
 }
 
