@@ -7,6 +7,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 import { createAmbientSnake } from './desktop/snake.js';
+import { drawCvTimeline as renderCvTimeline } from './cv-timeline.js';
 
 const root = document.documentElement;
 const MOBILE = () => window.innerWidth < 700;
@@ -161,20 +162,23 @@ function deskRect() {
   };
 }
 
-/* Where a new window should sit: cascade on desktop, near-full on a phone. */
-let cascade = 0;
+function usableDeskHeight() {
+  const { h } = deskRect();
+  const desktopTop = desktop.getBoundingClientRect().top;
+  const dockTop = dock.getBoundingClientRect().top - desktopTop;
+  return dockTop > 0 ? Math.min(h, dockTop - 8) : h;
+}
+
+/* New desktop windows are horizontally centred and use all space above the dock. */
 function nextRect(preferred) {
   const { w, h } = deskRect();
   if (MOBILE()) {
     return { x: 4, y: 4, w: w - 8, h: Math.min(h - 8, h * 0.86) };
   }
-  const ww = Math.min(preferred.w, w - 40);
-  const wh = Math.min(preferred.h, h - 40);
-  const step = 24;
-  const x = clamp(40 + (cascade % 6) * step, 8, Math.max(8, w - ww - 8));
-  const y = clamp(24 + (cascade % 6) * step, 8, Math.max(8, h - wh - 8));
-  cascade++;
-  return { x, y, w: ww, h: wh };
+  const ww = Math.round(w * 0.7);
+  const wh = Math.max(120, usableDeskHeight() - 8);
+  const x = Math.round((w - ww) / 2);
+  return { x, y: 4, w: ww, h: wh };
 }
 
 function focusWin(win) {
@@ -389,7 +393,7 @@ function showDesktop() {
 }
 
 function toggleZoom(win) {
-  const { w, h } = deskRect();
+  const { w } = deskRect();
   if (win.maximised) {
     Object.assign(win.el.style, {
       left: win.saved.x + 'px', top: win.saved.y + 'px',
@@ -403,7 +407,7 @@ function toggleZoom(win) {
     };
     Object.assign(win.el.style, {
       left: '4px', top: '4px',
-      width: (w - 8) + 'px', height: (h - 8) + 'px',
+      width: (w - 8) + 'px', height: (usableDeskHeight() - 8) + 'px',
     });
     win.maximised = true;
   }
@@ -514,6 +518,88 @@ async function openPage(url, opts = {}) {
   return win;
 }
 
+function drawCvTimeline(body) {
+  const container = body.querySelector('#timeline');
+  if (!container || container.dataset.rendered) return;
+  container.dataset.rendered = 'true';
+  const startYear = 2014;
+  const endYear = 2026.25;
+  const toYear = ([year, month, day = 1]) => year + (month + (day - 1) / 31) / 12;
+  const groups = [
+    { name: 'General', height: 54, tasks: [
+      ['Backend Java', [2014, 3], [2018, 6], 14, '#4285f4', 'inside'],
+      ['Full Stack', [2018, 6], [2019, 5], 14, '#4285f4', 'inside'],
+      ['Android', [2020, 4], [2026, 2], 14, '#db4437', 'inside'],
+    ] },
+    { name: 'Personal Projects', height: 118, tasks: [
+      ['WeClimb.Rocks: Android, Kotlin', [2015, 9], [2019, 11, 9], 14, '#ab61c9', 'inside'],
+      ['Cheat To Win: Flutter', [2019, 7], [2020, 3], 64, '#0f9d58', 'before'],
+      ['Location Alarm: KMM, Compose, SwiftUI', [2024, 11], [2025, 3], 14, '#f4b400', 'before'],
+      ['GrvMkr: Svelte on Web', [2025, 2], [2025, 6, 7], 64, '#e35d52', 'before'],
+    ] },
+    { name: 'Carv', height: 68, tasks: [
+      ['Android, Kotlin, Rust, Bluetooth', [2020, 4], [2024, 5, 30], 14, '#f4b400', 'inside'],
+      ['Android', [2024, 6], [2026, 2], 14, '#db4437', 'before'],
+    ] },
+    { name: 'O2 Projects', height: 118, tasks: [
+      ['Java, Spring, Appium, AWS', [2014, 3], [2017, 4, 1], 14, '#00acc1', 'inside'],
+      ['JS / TS, React, Express, Serverless, AWS', [2018, 6], [2019, 5], 14, '#9c3db8', 'after'],
+      ['Java, InfluxDB, Grafana', [2018, 9], [2019, 4, 28], 64, '#34a853', 'before'],
+    ] },
+    { name: 'Career Breaks', height: 68, tasks: [
+      ['Nepal, Europe', [2017, 4], [2018, 3], 14, '#2ab7ca', 'before'],
+      ['AUS, NZ, Bali', [2019, 5], [2020, 3], 14, '#ff7043', 'inside'],
+      ['NZ, AUS, SA, USA, CAD', [2024, 5], [2025, 4], 14, '#ff8a65', 'before'],
+    ] },
+  ];
+
+  const chart = document.createElement('div');
+  chart.className = 'cv-timeline';
+  groups.forEach(group => {
+    const row = document.createElement('div');
+    row.className = 'cv-timeline-row';
+    row.style.height = `${group.height}px`;
+    const groupEl = document.createElement('span');
+    groupEl.className = 'cv-timeline-group';
+    groupEl.textContent = group.name;
+    const track = document.createElement('div');
+    track.className = 'cv-timeline-track';
+    group.tasks.forEach(([label, start, end, top, color, labelMode]) => {
+      const left = ((toYear(start) - startYear) / (endYear - startYear)) * 100;
+      const width = ((toYear(end) - toYear(start)) / (endYear - startYear)) * 100;
+      const bar = document.createElement('span');
+      bar.className = 'cv-timeline-bar';
+      bar.style.left = `${left}%`;
+      bar.style.width = `${Math.max(width, 1.5)}%`;
+      bar.style.top = `${top}px`;
+      bar.style.backgroundColor = color;
+      bar.title = label;
+      if (labelMode === 'inside') bar.textContent = label;
+      track.appendChild(bar);
+      if (labelMode !== 'inside') {
+        const text = document.createElement('span');
+        text.className = `cv-timeline-label is-${labelMode}`;
+        text.textContent = label;
+        text.style.top = `${top + 4}px`;
+        text.style.left = `${labelMode === 'after' ? left + width + 1 : left - 1}%`;
+        track.appendChild(text);
+      }
+    });
+    row.append(groupEl, track);
+    chart.appendChild(row);
+  });
+  const axis = document.createElement('div');
+  axis.className = 'cv-timeline-axis';
+  for (let year = 2015; year <= 2026; year++) {
+    const tick = document.createElement('span');
+    tick.textContent = String(year);
+    tick.style.left = `${((year - startYear) / (endYear - startYear)) * 100}%`;
+    axis.appendChild(tick);
+  }
+  chart.appendChild(axis);
+  container.replaceChildren(chart);
+}
+
 /* ── projects: app window + info window ────────────────────── */
 
 function openProject(project) {
@@ -553,6 +639,15 @@ function openProject(project) {
     src: project.appUrl,
     icon: project.icon,
     rect: { x: gap * 2 + infoW, y: gap, w: appW, h: appH },
+  });
+}
+
+function openCv(opts = {}) {
+  return openPage('/cv/', {
+    title: 'CV', icon: 'doc', size: { w: 820, h: 640 }, rect: opts.rect,
+  }).then(win => {
+    renderCvTimeline(win.body);
+    return win;
   });
 }
 
@@ -696,6 +791,7 @@ async function restoreWindowSession() {
 function iconMeta(id) {
   if (id === 'blog') return { id: 'blog', name: 'Blog', icon: 'folder' };
   if (id === 'settings') return { id: 'settings', name: 'Settings', icon: 'settings' };
+  if (id === 'cv') return { id: 'cv', name: 'CV', icon: 'doc' };
   if (id === 'github') return { id: 'github', name: 'GitHub', icon: 'github' };
   if (id === 'linkedin') return { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin' };
   const p = data.projects.find(x => x.id === id);
@@ -786,12 +882,13 @@ function persistIcons() {
 }
 
 function activateIcon(el) {
+  const id = el.dataset.id;
+  if (id === 'cv') return openCv();
   const href = el.dataset.href;
   if (href) {
     window.open(href, '_blank', 'noopener,noreferrer');
     return;
   }
-  const id = el.dataset.id;
   if (id === 'blog') return openBlogFolder();
   if (id === 'settings') return openSettings();
   const project = data.projects.find(p => p.id === id);
@@ -991,7 +1088,8 @@ document.addEventListener('click', e => {
     showDesktop();
     return;
   }
-  openPage(url).then(win => {
+  const open = url === '/cv/' ? openCv() : openPage(url);
+  open.then(win => {
     history.pushState({ url }, '', url);
     document.title = win.title + ' | oliverdelange';
   });

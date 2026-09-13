@@ -175,6 +175,127 @@ body.standalone-page {
   background: transparent;
 }
 
+/* CV — the original A4 document styling, scoped to its Astro page. */
+.cv-page {
+  all: revert;
+  display: block;
+  color: #7c8081;
+  font: 12pt Tahoma, sans-serif;
+  font-size: 0.8em;
+  line-height: 1.5;
+}
+
+.cv-page * {
+  all: revert;
+  box-sizing: border-box;
+}
+
+.cv-page { box-sizing: border-box; }
+.cv-page a { color: #52adc8; text-decoration: none; }
+.cv-page a:hover { background: none; color: #52adc8; text-decoration: none; }
+
+.cv-page .page {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 10mm auto;
+  padding: 10mm;
+  border: 1px #d3d3d3 solid;
+  border-radius: 5px;
+  background: white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.cv-page h1,
+.cv-page h2,
+.cv-page h3,
+.cv-page h4,
+.cv-page h5,
+.cv-page h6 {
+  font-weight: 500;
+  line-height: 1.75em;
+  margin-bottom: 1em;
+  text-transform: uppercase;
+}
+
+.cv-page h1 { margin-top: 2em; }
+.cv-page header {
+  margin-bottom: 2em;
+  text-align: center;
+}
+.cv-page .contact-details { display: flex; }
+.cv-page .contact-detail { flex-grow: 1; }
+.cv-page #me { height: 200px; position: absolute; right: 30px; }
+
+.cv-page #timeline { height: auto !important; overflow: visible; width: 100%; }
+.cv-timeline { color: #303030; font: 9px Arial, sans-serif; min-width: 0; width: 100%; }
+.cv-timeline-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); }
+.cv-timeline-group { align-self: center; color: #555; font-size: 10px; padding: 0 8px; text-align: right; }
+.cv-timeline-track { background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(var(--year-step) - 1px), #d8d8d8 calc(var(--year-step) - 1px), #d8d8d8 var(--year-step)); position: relative; }
+.cv-timeline-item { box-sizing: border-box; font-size: 9px; overflow: visible; position: absolute; white-space: nowrap; }
+.cv-timeline-item.role { border-bottom: 2px solid #555; color: #333; height: 18px; padding-bottom: 3px; }
+.cv-timeline-item.project, .cv-timeline-item.employment { height: 7px; }
+.cv-timeline-item.purple { background: #ab61c9; }
+.cv-timeline-item.green { background: #0f9d58; }
+.cv-timeline-item.yellow { background: #f4b400; color: #222; }
+.cv-timeline-item.red { background: #e35d52; }
+.cv-timeline-item.employment.o2 { background: #14a8bc; }
+.cv-timeline-item.employment.carv { background: #e3a620; color: #222; }
+.cv-timeline-item.employment.freelance { background: #e3a620; opacity: 0.4; color: #222; }
+.cv-timeline-item.break { border-top: 2px solid #a7a7a7; color: #777; height: 2px; padding-top: 5px; transform: translateY(-100%); }
+.cv-timeline-text { color: #333; font-size: 8px; line-height: 1; position: absolute; white-space: nowrap; }
+.cv-timeline-text.is-above { color: #777; }
+.cv-timeline-text.is-right { text-align: right; }
+.cv-timeline-row.breaks .cv-timeline-group { color: #999; }
+.cv-timeline-axis { height: 24px; margin-left: 96px; position: relative; }
+.cv-timeline-axis span { bottom: 0; font-size: 10px; position: absolute; transform: translateX(-50%); }
+
+@media print {
+  @page { size: A4; margin: 0; }
+
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .standalone-page main {
+    width: 210mm;
+    margin: 0;
+    padding: 0;
+  }
+
+  .cv-page .page {
+    box-sizing: border-box;
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    padding: 10mm;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: white;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .cv-page .page:last-of-type {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .cv-page #timeline,
+  .cv-timeline {
+    display: block !important;
+    overflow: visible;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
 a {
   color: var(--ink);
   text-decoration: underline;

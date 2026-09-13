@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import cvSource from '../../content/cv.html?raw';
+
+const cvBody = (cvSource.match(/<body>([\s\S]*?)\s*<script type="text\/javascript"/i)?.[1] ?? '')
+  .replace(
+    'href="carv_rating.png"',
+    'href="/assets/images/carv/rating.png" target="_blank" rel="noopener"',
+  );
+---
+
+<BaseLayout title="CV" description="Oliver Culley De Lange's CV" windowTitle="CV" wide>
+  <article class="cv-page" set:html={cvBody}></article>
+</BaseLayout>
+
+<script>
+  import { drawCvTimeline } from '../../scripts/cv-timeline.js';
+  drawCvTimeline();
+</script>
