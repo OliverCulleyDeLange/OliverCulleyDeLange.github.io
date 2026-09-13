@@ -51,6 +51,7 @@ const wins = new Map();
 let zTop = 20;
 let activeWin = null;
 let trashed = new Set(store.read('odl-trash', []));
+let restoringSession = false;
 
 /* ── helpers ───────────────────────────────────────────────── */
 
@@ -180,6 +181,43 @@ function focusWin(win) {
   wins.forEach(w => w.el.classList.toggle('is-active', w === win));
   updateDockState();
   syncBrowserItem();
+  saveWindowSession();
+}
+
+/* ── desktop session ───────────────────────────────────────── */
+
+function savedRect(win) {
+  const rect = win.maximised && win.saved ? win.saved : {
+    x: win.el.offsetLeft, y: win.el.offsetTop,
+    w: win.el.offsetWidth, h: win.el.offsetHeight,
+  };
+  return { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+}
+
+function saveWindowSession() {
+  if (restoringSession) return;
+  const windows = [...wins.values()].map(win => ({
+    id: win.id,
+    url: win.url,
+    rect: savedRect(win),
+    minimised: win.minimised,
+    maximised: win.maximised,
+    z: win.z,
+  }));
+  store.write('odl-window-session', { version: 1, activeId: activeWin?.id || null, windows });
+}
+
+function restoredRect(rect) {
+  if (!rect || MOBILE()) return undefined;
+  const { w, h } = deskRect();
+  const width = clamp(Number(rect.w) || 640, 240, Math.max(240, w - 4));
+  const height = clamp(Number(rect.h) || 460, 120, Math.max(120, h - 4));
+  return {
+    x: clamp(Number(rect.x) || 0, -width + 80, Math.max(0, w - 80)),
+    y: clamp(Number(rect.y) || 0, 0, Math.max(0, h - 28)),
+    w: width,
+    h: height,
+  };
 }
 
 /* The left dock item is always Home; it never represents an open window. */
@@ -288,6 +326,7 @@ function openWindow(opts) {
   syncDock();
   focusWin(win);
   if (MOBILE()) win.maximised = false;
+  saveWindowSession();
   return win;
 }
 
@@ -300,6 +339,7 @@ function closeWin(win) {
   }
   syncDock();
   syncBrowserItem();
+  saveWindowSession();
   // Closing the window that owns the URL returns us to the desktop.
   if (win.url && location.pathname === win.url) {
     history.pushState({}, '', '/');
@@ -316,12 +356,14 @@ function minimiseWin(win) {
   }
   syncDock();
   syncBrowserItem();
+  saveWindowSession();
 }
 
 function restoreWin(win) {
   win.minimised = false;
   win.el.hidden = false;
   syncDock();
+  saveWindowSession();
 }
 
 /* Clear the screen back to the desktop. Minimise rather than close, so
@@ -340,6 +382,7 @@ function showDesktop() {
   if (!changed) toast('You’re already viewing the desktop');
   history.pushState({}, '', '/');
   document.title = 'oliverdelange';
+  saveWindowSession();
 }
 
 function toggleZoom(win) {
@@ -362,6 +405,7 @@ function toggleZoom(win) {
     win.maximised = true;
   }
   win.el.classList.toggle('is-max', win.maximised);
+  saveWindowSession();
 }
 
 /* ── drag & resize (pointer events, so touch works too) ────── */
@@ -387,6 +431,7 @@ function makeDraggable(handle, el, win) {
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       handle.removeEventListener('pointercancel', up);
+      saveWindowSession();
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
@@ -413,6 +458,7 @@ function makeResizable(grip, el, win) {
       grip.removeEventListener('pointermove', move);
       grip.removeEventListener('pointerup', up);
       grip.removeEventListener('pointercancel', up);
+      saveWindowSession();
     };
     grip.addEventListener('pointermove', move);
     grip.addEventListener('pointerup', up);
@@ -509,7 +555,7 @@ function openProject(project) {
 
 /* ── the Blog folder ───────────────────────────────────────── */
 
-function openBlogFolder() {
+function openBlogFolder(opts = {}) {
   const id = 'folder:blog';
   if (wins.has(id)) { const w = wins.get(id); restoreWin(w); focusWin(w); return; }
 
@@ -534,13 +580,13 @@ function openBlogFolder() {
 
   openWindow({
     id, title: 'Blog', kind: 'folder', icon: 'folder',
-    node: list, size: { w: 620, h: 440 },
+    node: list, size: { w: 620, h: 440 }, rect: opts.rect,
   });
 }
 
 /* ── trash ─────────────────────────────────────────────────── */
 
-function openTrash() {
+function openTrash(opts = {}) {
   const id = 'folder:trash';
   if (wins.has(id)) { const w = wins.get(id); restoreWin(w); focusWin(w); return; }
 
@@ -577,7 +623,71 @@ function openTrash() {
   render();
   node.addEventListener('odl:refresh', render);
 
-  openWindow({ id, title: 'Trash', kind: 'folder', icon: 'folder', node, size: { w: 420, h: 320 } });
+  openWindow({ id, title: 'Trash', kind: 'folder', icon: 'folder', node, size: { w: 420, h: 320 }, rect: opts.rect });
+}
+
+async function restoreSessionWindow(entry) {
+  const rect = restoredRect(entry.rect);
+  let win;
+
+  if (entry.id === 'about') {
+    openAbout({ rect });
+  } else if (entry.id === 'settings') {
+    openSettings({ rect });
+  } else if (entry.id === 'folder:blog') {
+    openBlogFolder({ rect });
+  } else if (entry.id === 'folder:trash') {
+    openTrash({ rect });
+  } else if (entry.id.startsWith('app:')) {
+    const project = data.projects.find(item => item.id === entry.id.slice(4));
+    if (project?.appUrl) {
+      openWindow({
+        id: entry.id, title: project.name, kind: 'app', src: project.appUrl,
+        icon: project.icon, rect,
+      });
+    }
+  } else if (entry.id.startsWith('page:')) {
+    const url = typeof entry.url === 'string' && entry.url.startsWith('/')
+      ? entry.url
+      : entry.id.slice(5);
+    if (url.startsWith('/')) await openPage(url, { rect });
+  }
+
+  win = wins.get(entry.id);
+  if (!win) return;
+  if (entry.maximised) toggleZoom(win);
+  if (entry.minimised) minimiseWin(win);
+}
+
+async function restoreWindowSession() {
+  const session = store.read('odl-window-session', null);
+  if (!session || session.version !== 1 || !Array.isArray(session.windows)) return;
+
+  restoringSession = true;
+  try {
+    const entries = session.windows
+      .filter(entry => entry && typeof entry.id === 'string')
+      .sort((a, b) => (Number(a.z) || 0) - (Number(b.z) || 0));
+    for (const entry of entries) await restoreSessionWindow(entry);
+
+    entries.forEach(entry => {
+      const win = wins.get(entry.id);
+      if (!win) return;
+      win.z = Number(entry.z) || 0;
+      win.el.style.zIndex = win.z;
+    });
+    zTop = Math.max(20, ...[...wins.values()].map(win => win.z));
+    const active = wins.get(session.activeId);
+    activeWin = active && !active.minimised
+      ? active
+      : [...wins.values()].filter(win => !win.minimised).sort((a, b) => b.z - a.z)[0] || null;
+    wins.forEach(win => win.el.classList.toggle('is-active', win === activeWin));
+    syncDock();
+    syncBrowserItem();
+  } finally {
+    restoringSession = false;
+  }
+  saveWindowSession();
 }
 
 function iconMeta(id) {
@@ -936,7 +1046,10 @@ function boot() {
         win.el.style.top = clamp(win.el.offsetTop, 0, Math.max(0, h - 28)) + 'px';
       }
     });
+    saveWindowSession();
   });
+
+  void restoreWindowSession();
 }
 
 /* dock trash: click opens it, and it is the drop target handled above */
@@ -1036,31 +1149,24 @@ function applyDisplayScale(scale) {
   store.write('odl-display-scale', scale);
 }
 
-function openAbout() {
+function openAbout(opts = {}) {
   const node = document.createElement('div');
   node.className = 'about-pane';
   node.innerHTML = `
     <h2>oliverdelange.co.uk</h2>
-    <p class="about-tagline">A blog I probably won't keep up to date.</p>
+    <p class="about-tagline">A blog, project showcase and mini web-OS.</p>
     <dl class="about-spec">
-      <dt>Built with</dt><dd>Astro, static output, no UI framework</dd>
-      <dt>Interface</dt><dd>Classic Mac OS (System 6/7), hand-rolled CSS</dd>
-      <dt>Typeface</dt><dd>ChiKareGo2, a Chicago 12pt recreation by Giles Booth</dd>
-      <dt>Windows</dt><dd>Progressive enhancement &mdash; every page still works without JavaScript</dd>
+      <dt>Built with</dt><dd>Various AI models</dd>
+      <dt>Inspired by</dt><dd>Posthog, Mac OS, Linux</dd>
     </dl>
-    <p class="about-foot">
-      <a href="https://github.com/OliverCulleyDeLange" target="_blank" rel="noopener">GitHub</a>
-      &middot;
-      <a href="https://www.linkedin.com/in/oliverdelange" target="_blank" rel="noopener">LinkedIn</a>
-    </p>
   `;
   openWindow({
     id: 'about', title: 'About This Site', kind: 'folder',
-    icon: 'monogram', node, size: { w: 460, h: 380 },
+    icon: 'monogram', node, size: { w: 460, h: 380 }, rect: opts.rect,
   });
 }
 
-function openSettings() {
+function openSettings(opts = {}) {
   const node = document.createElement('div');
   node.className = 'settings-pane';
   node.innerHTML = `
@@ -1113,7 +1219,7 @@ function openSettings() {
 
   openWindow({
     id: 'settings', title: 'Settings', kind: 'folder',
-    icon: 'monogram', node, size: { w: 400, h: 360 },
+    icon: 'monogram', node, size: { w: 400, h: 360 }, rect: opts.rect,
   });
 }
 
