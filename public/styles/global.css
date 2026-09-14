@@ -2305,3 +2305,76 @@ html.is-locked body {
   -webkit-touch-callout: none;
   touch-action: manipulation;
 }
+
+/* ── Arcade games (Pong, Pinball, …) ──
+   Shared shell for every canvas-based game page: a centred stage with a
+   small HUD above a fixed-aspect canvas. Each game's own page picks the
+   canvas's aspect ratio and max width; this is the part they all share. */
+.game-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 100%;
+  padding: 0.75rem;
+  box-sizing: border-box;
+  background: var(--paper);
+}
+
+.game-hud {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.game-score {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-message {
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.game-canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.game-canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border: 1px solid var(--ink);
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* The game grabs focus itself on load so its keydown handlers actually see
+   key presses (the desktop shell never focuses the iframe it sits in) — but
+   that shouldn't paint a focus ring unless the player actually tabbed here. */
+.game-canvas:focus { outline: none; }
+.game-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+body.standalone-page:has(.game-stage) { overflow: hidden; }
+.standalone-page main:has(.game-stage),
+.standalone-page .window:has(.game-stage),
+.standalone-page .window-body:has(.game-stage) {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+html.is-framed .game-stage { height: 100%; min-height: 0; }

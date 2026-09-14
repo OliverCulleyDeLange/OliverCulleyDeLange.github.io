@@ -645,6 +645,16 @@ function openProject(project) {
     return;
   }
 
+  if (project.standalone) {
+    // Games and other self-contained apps are the whole experience — no
+    // separate Info window to tile alongside them.
+    openWindow({
+      id: 'app:' + project.id, title: project.name, kind: 'app',
+      src: project.appUrl, icon: project.icon,
+    });
+    return;
+  }
+
   if (MOBILE()) {
     // No room to tile: the app on top, info stacked behind it.
     openPage(infoUrl, { title: project.name + ' — Info', icon: project.icon });

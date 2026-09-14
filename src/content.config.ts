@@ -22,6 +22,12 @@ const projects = defineCollection({
     githubUrl: z.string().url().optional(),
     relatedPosts: z.array(z.string()).optional().default([]),
     order: z.number().optional().default(99),
+    // Self-contained apps (games, toys) that don't need a projects/[slug] blog
+    // page or the Info-window-beside-the-app layout — the app is the whole
+    // experience.
+    standalone: z.boolean().optional().default(false),
+    // Pins a desktop icon to a screen corner instead of the normal icon flow.
+    pinned: z.enum(['tr', 'br']).optional(),
   }),
 });
 

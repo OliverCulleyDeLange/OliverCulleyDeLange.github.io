@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Dolphin Olympics"
+  description="A tribute port of Alan Rawkins' Flash classic Dolphin Olympics 2 — two minutes to dive, launch, flip, roll, tailslide and ride star trails as high as the solar system will let you."
+  windowTitle="Dolphin Olympics"
+  wide
+>
+  <section class="game-stage dolphin-stage" aria-label="Dolphin Olympics">
+    <div class="game-canvas-wrap dolphin-canvas-wrap">
+      <canvas
+        id="dolphin-canvas"
+        class="game-canvas"
+        aria-label="Dolphin Olympics. Hold up or W to accelerate. Left and right, or A and D, turn underwater and spin in the air for flips. Down or S rolls for a corkscrew, and held as you surface starts a tailslide along the water; press up to pop off it. Escape pauses. Original game by Alan Rawkins. You have two minutes to score as many tricks as you can and climb as high as you dare."
+      ></canvas>
+    </div>
+    <p class="dolphin-credit">
+      A tribute port of <em>Dolphin Olympics 2</em>, the Flash game by Alan Rawkins &mdash;
+      <a href="https://www.rawkins.com" target="_blank" rel="noopener">rawkins.com</a>.
+    </p>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  /* Shared .game-stage / .game-canvas rules live in global.css; the whole
+     game, HUD and menus included, draws inside its own 640x480 stage. */
+  .dolphin-canvas-wrap .game-canvas { aspect-ratio: 640 / 480; }
+
+  .dolphin-credit {
+    margin: 0;
+    max-width: 640px;
+    text-align: center;
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .dolphin-credit a { color: var(--accent); }
+</style>
+
+<script>
+  import { createDolphinOlympics } from '../scripts/games/dolphin-olympics';
+
+  const canvas = document.getElementById('dolphin-canvas') as HTMLCanvasElement;
+  createDolphinOlympics(canvas);
+</script>

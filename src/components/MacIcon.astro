@@ -8,7 +8,8 @@ interface Props {
     | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'memory'
-    | 'scribbles' | 'location-alarm' | 'climb' | 'map';
+    | 'scribbles' | 'location-alarm' | 'climb' | 'map'
+    | 'pinball' | 'dolphin-olympics';
   size?: number;
   class?: string;
 }
@@ -273,6 +274,32 @@ const letterO: [number, number, number][] = [
     <path d="M7.5 6 L8.5 5 L9.5 6 L10.5 5 L11.5 6 L10 2 Z" fill="var(--paper)"/>
     {/* Front peak — paper with outline, in front of rear */}
     <path d="M0 14 L5 7 L11 14 Z" fill="var(--paper)" stroke="currentColor" stroke-width="1" stroke-linejoin="miter"/>
+  </svg>
+)}
+{name === 'pinball' && (
+  /* Pinball — a ball above two angled flippers, framed like a tiny table. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <rect x="0.5" y="0.5" width="15" height="15" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <circle cx="8" cy="4" r="1.5" fill="currentColor"/>
+    <circle cx="4.5" cy="9" r="1" fill="currentColor"/>
+    <circle cx="11.5" cy="9" r="1" fill="currentColor"/>
+    <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+      <path d="M3 13.5 6.75 11.25"/>
+      <path d="M13 13.5 9.25 11.25"/>
+    </g>
+  </svg>
+)}
+{name === 'dolphin-olympics' && (
+  /* Dolphin Olympics — a dolphin mid-leap over a wavy waterline. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <rect x="0.5" y="0.5" width="15" height="15" fill="var(--paper)" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
+    <path d="M1 12.5q1.5-1.5 3 0t3 0t3 0t3 0" fill="none" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
+    <g fill="currentColor">
+      <ellipse cx="8" cy="6.5" rx="3.6" ry="2" transform="rotate(-25 8 6.5)"/>
+      <path d="M10.8 5.2 13 4 11.6 6.4Z"/>
+      <path d="M5.6 7.6 3.6 9.4 5.2 6.6Z"/>
+      <path d="M7.6 4.6 8.6 2 9.4 4.8Z"/>
+    </g>
   </svg>
 )}
 {name === 'map' && (
