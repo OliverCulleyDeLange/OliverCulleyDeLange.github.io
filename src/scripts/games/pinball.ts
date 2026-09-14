@@ -3,21 +3,47 @@
    the page around it just supplies a canvas and a few HUD callbacks, and a
    high score is persisted under its own storage key.
 
-   Obstructions ("bumpers") are randomised each new game and colour-coded by
-   effect — see BUMPER_KINDS below for what each colour does. */
+   The table's obstructions ("bumpers") and holes are the player's to
+   arrange: there is at most one bumper of each colour, placed by picking a
+   colour in the page's palette and clicking the table, moved by dragging
+   its middle, resized by dragging its rim, removed with a double-click.
+   Holes are placed the same way (as many as you like) and are where a ball
+   swallowed by the red bumper comes back out. The layout is remembered
+   between visits. What each colour does is described in BUMPER_KINDS. */
 
 const LOGICAL_W = 360;
 const LOGICAL_H = 620;
+// The playfield runs from the left wall (x = 14) to the launch lane wall
+// (x = 312); everything in it is laid out symmetrically about this line.
+const FIELD_CX = (14 + 312) / 2;
 
 const GRAVITY = 780; // px/s^2
 const BALL_RADIUS = 7;
 const WALL_THICKNESS = 3;
 const MAX_SPEED = 1050;
+// Physics runs in sub-steps short enough that nothing moves more than this
+// far per step, so a fast ball can't skip straight through a wall.
+const MAX_STEP_DISTANCE = 4;
 const LIVES_START = 3;
-const LAUNCH_VELOCITY = 940;
+const LAUNCH_VELOCITY = 940; // a fully charged plunger
+const LAUNCH_VELOCITY_MIN = 420; // a tap
+const CHARGE_SECONDS = 1.1; // hold this long for full power
+const PLUNGER_TRAVEL = 22; // px the plunger head compresses at full charge
 const MAX_BALLS = 4;
-const MAX_BUMPERS = 9;
 const HIGH_SCORE_KEY = 'odl-pinball-highscore';
+const LAYOUT_KEY = 'odl-pinball-layout';
+
+const MIN_BUMPER_RADIUS = 10;
+const MAX_BUMPER_RADIUS = 38;
+const DEFAULT_BUMPER_RADIUS = 18;
+const HOLE_RADIUS = 11;
+const MAX_HOLES = 6;
+const RESPAWN_DELAY = 420; // ms between being swallowed and popping out of a hole
+const EMERGE_SPEED = 330;
+const KICKBACK_DELAY = 350; // ms a ball rests at the foot of a lane before being fired back up
+// Pressing within this fraction of a bumper's radius drags it; further out
+// (on the rim) drags its size instead.
+const MOVE_ZONE = 0.6;
 
 type Point = { x: number; y: number };
 type Segment = { a: Point; b: Point };
@@ -38,7 +64,9 @@ interface Flipper {
   side: 'left' | 'right';
 }
 
-type BumperType = 'grey' | 'green' | 'red' | 'yellow' | 'purple' | 'pink';
+export type BumperType = 'green' | 'red' | 'purple';
+/* Anything the palette can put on the table. */
+export type PlaceableKind = BumperType | 'hole';
 
 interface Bumper {
   x: number;
@@ -61,25 +89,55 @@ interface Ball {
   vy: number;
 }
 
+/* Short-lived visual flourishes: expanding rings on hits, a shrinking ring
+   where a ball was swallowed, a burst where one pops out of a hole. */
+interface Effect {
+  x: number;
+  y: number;
+  colour: string;
+  start: number;
+  duration: number;
+  kind: 'ring' | 'swallow' | 'emerge';
+  size: number;
+}
+
 export interface PinballHud {
   setScore(score: number): void;
   setLives(lives: number): void;
   setMessage(text: string | null): void;
   setHighScore(score: number): void;
+  /* Which palette item is armed for placing, if any. */
+  setSelectedKind(kind: PlaceableKind | null): void;
+  /* Which colours currently have a bumper on the table ('hole' if any holes). */
+  setPlacedKinds(kinds: PlaceableKind[]): void;
 }
 
 /* What each obstruction colour does, and how many points it's worth. Hinge
-   effects (removal, splitting, spawning) are applied by the caller since
+   effects (swallowing, splitting, spawning) are applied by the caller since
    they need access to the ball list; this only describes the bounce. */
-const BUMPER_KINDS: Record<BumperType, { score: number; colour: string }> = {
-  grey: { score: 50, colour: '#9aa1a9' },
-  green: { score: 100, colour: '#22c55e' },
-  red: { score: 200, colour: '#ef4444' },
-  yellow: { score: 75, colour: '#eab308' },
-  purple: { score: 150, colour: '#a855f7' },
-  pink: { score: 125, colour: '#ec4899' },
+export const BUMPER_KINDS: Record<BumperType, { score: number; colour: string; label: string }> = {
+  green: { score: 100, colour: '#34d399', label: 'Speeds up' },
+  red: { score: 200, colour: '#f87171', label: 'Swallows, respawns from a hole' },
+  purple: { score: 150, colour: '#c084fc', label: 'Splits ball' },
 };
-const BUMPER_TYPES = Object.keys(BUMPER_KINDS) as BumperType[];
+export const BUMPER_TYPES = Object.keys(BUMPER_KINDS) as BumperType[];
+
+interface Layout {
+  bumpers: { type: BumperType; x: number; y: number; radius: number }[];
+  holes: Point[];
+}
+
+const DEFAULT_LAYOUT: Layout = {
+  bumpers: [
+    { type: 'green', x: FIELD_CX, y: 150, radius: 20 },
+    { type: 'red', x: FIELD_CX - 60, y: 280, radius: 17 },
+    { type: 'purple', x: FIELD_CX + 60, y: 280, radius: 17 },
+  ],
+  holes: [
+    { x: FIELD_CX - 90, y: 400 },
+    { x: FIELD_CX + 90, y: 400 },
+  ],
+};
 
 function readHighScore(): number {
   try {
@@ -91,6 +149,10 @@ function readHighScore(): number {
 
 function writeHighScore(value: number): void {
   try { localStorage.setItem(HIGH_SCORE_KEY, String(value)); } catch (error) {}
+}
+
+function isBumperType(value: unknown): value is BumperType {
+  return typeof value === 'string' && (BUMPER_TYPES as string[]).includes(value);
 }
 
 /* A curved wall is just a polyline of short segments — cheap to collide
@@ -126,9 +188,14 @@ function closestOnSegment(p: Point, a: Point, b: Point): { point: Point; t: numb
   return { point: { x: a.x + dx * t, y: a.y + dy * t }, t };
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
 export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   const context = canvas.getContext('2d');
-  if (!context) return { destroy() {} };
+  if (!context) return { destroy() {}, selectKind(_kind: PlaceableKind | null) {} };
   const ctx: CanvasRenderingContext2D = context;
 
   const walls: Segment[] = [
@@ -137,37 +204,54 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     { a: { x: 60, y: 14 }, b: { x: 300, y: 14 } },
     ...arcSegments({ x: 300, y: 60 }, 46, 270, 360),
     { a: { x: 346, y: 60 }, b: { x: 346, y: 600 } },
-    // Guide funnelling the main field down toward the left flipper's hinge.
-    { a: { x: 14, y: 480 }, b: { x: 92, y: 558 } },
-    // The right-side launch lane: walls the plunger channel off from the
-    // main field, so a freshly launched ball can only travel up and over
-    // the curved top rather than straight into the bumpers.
+    // The launch lane down the right side: walls the plunger channel off
+    // from the playfield, so a freshly launched ball can only travel up and
+    // over the curved top. A ball that drops back into its foot is kicked
+    // straight back up, so it is never a dead pocket.
     { a: { x: 312, y: 560 }, b: { x: 312, y: 72 } },
-    // Curls the lane's foot in toward the right flipper's hinge, for any
-    // ball that ends up back down in that pocket during normal play.
-    { a: { x: 312, y: 560 }, b: { x: 268, y: 558 } },
+    // The playfield between the left wall and the lane is symmetrical about
+    // its own centre line (x = FIELD_CX): matching guides slope from each
+    // side down to the flipper hinges so nothing settles beside them.
+    { a: { x: 14, y: 480 }, b: { x: FIELD_CX - 88, y: 558 } },
+    { a: { x: 312, y: 480 }, b: { x: FIELD_CX + 88, y: 558 } },
   ];
 
   // Flippers hinge on the OUTER side and point in toward the centre gap at
   // rest, snapping up (still centre-ward) when fired — mirror images of
-  // each other around the table's centreline (x = 180).
+  // each other around the playfield's centreline.
   const flippers: Flipper[] = [
-    { pivot: { x: 92, y: 555 }, restAngle: deg(20), activeAngle: deg(-75), angle: 0, active: false, side: 'left' },
-    { pivot: { x: 268, y: 555 }, restAngle: deg(160), activeAngle: deg(255), angle: 0, active: false, side: 'right' },
+    { pivot: { x: FIELD_CX - 88, y: 555 }, restAngle: deg(20), activeAngle: deg(-75), angle: 0, active: false, side: 'left' },
+    { pivot: { x: FIELD_CX + 88, y: 555 }, restAngle: deg(160), activeAngle: deg(255), angle: 0, active: false, side: 'right' },
   ];
   flippers.forEach(flipper => { flipper.angle = flipper.restAngle; });
 
   // Where the ball drains if it slips between the resting flipper tips.
-  const drain = { left: 148, right: 212, y: 600 };
-  // A red bumper teleports a lone ball back into play here instead of
-  // costing a life — drawn as a dashed "warp" ring so it reads as a feature.
-  const respawn = { x: 180, y: 110, radius: 16 };
-  // The ball waits in the right-hand lane and launches straight up it.
-  const launchPad = { x: 329, y: 545 };
+  const drain = { left: FIELD_CX - 32, right: FIELD_CX + 32, y: 600 };
+  // Holes the player has placed. A red bumper swallows the ball, and if it
+  // was the last one in play it pops back out of one of these at random.
+  let holes: Point[] = [];
+  // The ball waits at the foot of the lane and launches straight up it.
+  const launchPad: Point = { x: 329, y: 545 };
+  // A one-way flap across the top of the lane: open while a ball is still
+  // in the lane, shut once it's out so nothing can drop back in.
+  const gate: Segment = { a: { x: 312, y: 72 }, b: { x: 346, y: 72 } };
+  let gateClosed = false;
+  let gateAnim = 0; // 0 open, 1 closed
+  // Plunger: hold Down (or the pointer) to compress it, release to fire.
+  let charging = false;
+  let charge = 0;
+
+  // Bumpers may sit anywhere in the open field, clear of the walls, the
+  // lane and the flipper area.
+  const field = { left: 14 + WALL_THICKNESS, right: 312 - WALL_THICKNESS, top: 14 + WALL_THICKNESS, bottom: 468 };
 
   let bumpers: Bumper[] = [];
   let balls: Ball[] = [];
+  let effects: Effect[] = [];
   let launchReady = false;
+  let pendingRespawn = 0;
+  // Balls resting at the foot of the lane, keyed by ball, with when to kick.
+  const kickbacks = new Map<Ball, number>();
 
   let score = 0;
   let lives = LIVES_START;
@@ -176,10 +260,18 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   let lastTime = 0;
   let animationFrame: number | null = null;
 
+  let selectedKind: PlaceableKind | null = null;
+  type Drag =
+    | { kind: 'resize'; bumper: Bumper }
+    | { kind: 'move'; bumper: Bumper; dx: number; dy: number }
+    | { kind: 'hole'; hole: Point; dx: number; dy: number };
+  let dragging: Drag | null = null;
+  let hovered: { bumper: Bumper; rim: boolean } | { hole: Point } | null = null;
+
   hud.setHighScore(highScore);
 
   function resize() {
-    // The canvas can now be displayed at any size the window allows (see
+    // The canvas can be displayed at any size the window allows (see
     // pinball.astro) — size the backing bitmap to match how big it's
     // actually rendered, not a fixed constant, or it gets blurry once
     // stretched past its old fixed max-width.
@@ -191,50 +283,146 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
   }
 
-  function randomBumperType(): BumperType {
-    return BUMPER_TYPES[Math.floor(Math.random() * BUMPER_TYPES.length)];
+  /* --- layout: one bumper per colour ------------------------------ */
+
+  function notifyPlaced() {
+    const kinds: PlaceableKind[] = bumpers.map(b => b.type);
+    if (holes.length) kinds.push('hole');
+    hud.setPlacedKinds(kinds);
   }
 
-  /* Rejection-samples a spot for a new obstruction: inside the open field,
-     clear of the launch lane, the respawn ring, and other obstructions. */
-  function findBumperSpot(existing: Bumper[]): Point | null {
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const x = 45 + Math.random() * 235; // stays clear of the launch lane at x >= 312
-      const y = 70 + Math.random() * 370;
-      if (Math.hypot(x - launchPad.x, y - launchPad.y) < 60) continue;
-      if (Math.hypot(x - respawn.x, y - respawn.y) < 50) continue;
-      if (existing.some(b => Math.hypot(x - b.x, y - b.y) < b.radius + 42)) continue;
-      return { x, y };
+  function saveLayout() {
+    try {
+      const layout: Layout = {
+        bumpers: bumpers.map(({ type, x, y, radius }) => ({ type, x, y, radius })),
+        holes: holes.map(({ x, y }) => ({ x, y })),
+      };
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+    } catch (error) {}
+    notifyPlaced();
+  }
+
+  function loadLayout() {
+    let saved: unknown = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null');
+    } catch (error) {
+      saved = null;
+    }
+    // An older save was a bare array of bumpers.
+    const source: Layout = Array.isArray(saved)
+      ? { bumpers: saved, holes: DEFAULT_LAYOUT.holes }
+      : saved && typeof saved === 'object' && Array.isArray((saved as Layout).bumpers)
+        ? { bumpers: (saved as Layout).bumpers, holes: Array.isArray((saved as Layout).holes) ? (saved as Layout).holes : [] }
+        : DEFAULT_LAYOUT;
+    holes = [];
+    for (const item of source.holes as { x?: unknown; y?: unknown }[]) {
+      if (typeof item.x !== 'number' || typeof item.y !== 'number' || holes.length >= MAX_HOLES) continue;
+      holes.push(constrainHole({ x: item.x, y: item.y }));
+    }
+    bumpers = [];
+    for (const item of source.bumpers as { type?: unknown; x?: unknown; y?: unknown; radius?: unknown }[]) {
+      if (!isBumperType(item.type) || typeof item.x !== 'number' || typeof item.y !== 'number') continue;
+      if (bumpers.some(b => b.type === item.type)) continue;
+      const bumper: Bumper = {
+        type: item.type,
+        x: item.x,
+        y: item.y,
+        radius: typeof item.radius === 'number' ? item.radius : DEFAULT_BUMPER_RADIUS,
+        flashUntil: 0,
+        cooldownUntil: 0,
+      };
+      constrainBumper(bumper);
+      bumpers.push(bumper);
+    }
+    notifyPlaced();
+  }
+
+  function constrainBumper(bumper: Bumper) {
+    bumper.radius = Math.min(Math.max(bumper.radius, MIN_BUMPER_RADIUS), MAX_BUMPER_RADIUS);
+    bumper.x = Math.min(Math.max(bumper.x, field.left + bumper.radius + 2), field.right - bumper.radius - 2);
+    bumper.y = Math.min(Math.max(bumper.y, field.top + bumper.radius + 2), field.bottom - bumper.radius);
+  }
+
+  function constrainHole(hole: Point): Point {
+    hole.x = Math.min(Math.max(hole.x, field.left + HOLE_RADIUS + 4), field.right - HOLE_RADIUS - 4);
+    hole.y = Math.min(Math.max(hole.y, field.top + HOLE_RADIUS + 4), field.bottom - HOLE_RADIUS);
+    return hole;
+  }
+
+  /* What is under a point: a bumper (and whether the press is on its rim,
+     which resizes, rather than its middle, which moves), or a hole. */
+  function itemAt(p: Point): { bumper: Bumper; rim: boolean } | { hole: Point } | null {
+    for (let i = bumpers.length - 1; i >= 0; i--) {
+      const b = bumpers[i];
+      const d = Math.hypot(p.x - b.x, p.y - b.y);
+      if (d <= b.radius + 5) return { bumper: b, rim: d > b.radius * MOVE_ZONE };
+    }
+    for (let i = holes.length - 1; i >= 0; i--) {
+      const h = holes[i];
+      if (Math.hypot(p.x - h.x, p.y - h.y) <= HOLE_RADIUS + 5) return { hole: h };
     }
     return null;
   }
 
-  function spawnRandomBumper(): void {
-    if (bumpers.length >= MAX_BUMPERS) return;
-    const spot = findBumperSpot(bumpers);
-    if (!spot) return;
-    bumpers.push({ x: spot.x, y: spot.y, radius: 16 + Math.random() * 6, type: randomBumperType(), flashUntil: 0, cooldownUntil: 0 });
+  function placeHole(p: Point): Point | null {
+    if (holes.length >= MAX_HOLES) return null;
+    const hole = constrainHole({ x: p.x, y: p.y });
+    holes.push(hole);
+    return hole;
   }
 
-  function generateBumpers(): void {
-    bumpers = [];
-    for (let i = 0; i < 5; i++) spawnRandomBumper();
+  /* Put the given colour's bumper at a point — moving it if it is already
+     on the table, creating it otherwise. */
+  function placeBumper(type: BumperType, p: Point): Bumper {
+    let bumper = bumpers.find(b => b.type === type);
+    if (!bumper) {
+      bumper = { type, x: p.x, y: p.y, radius: DEFAULT_BUMPER_RADIUS, flashUntil: 0, cooldownUntil: 0 };
+      bumpers.push(bumper);
+    } else {
+      bumper.x = p.x;
+      bumper.y = p.y;
+    }
+    constrainBumper(bumper);
+    return bumper;
   }
+
+  function removeBumper(bumper: Bumper) {
+    bumpers = bumpers.filter(b => b !== bumper);
+    effects.push({ x: bumper.x, y: bumper.y, colour: BUMPER_KINDS[bumper.type].colour, start: performance.now(), duration: 260, kind: 'swallow', size: bumper.radius });
+    saveLayout();
+  }
+
+  function removeHole(hole: Point) {
+    holes = holes.filter(h => h !== hole);
+    effects.push({ x: hole.x, y: hole.y, colour: '#dfe7f5', start: performance.now(), duration: 260, kind: 'swallow', size: HOLE_RADIUS + 3 });
+    saveLayout();
+  }
+
+  function selectKind(kind: PlaceableKind | null) {
+    selectedKind = kind;
+    hud.setSelectedKind(kind);
+    updateCursor();
+  }
+
+  /* --- game flow --------------------------------------------------- */
 
   function restBallOnLaunchPad() {
     balls = [];
+    kickbacks.clear();
+    pendingRespawn = 0;
     launchReady = true;
+    charging = false;
+    charge = 0;
   }
 
   function startGame() {
     score = 0;
     lives = LIVES_START;
     gameOver = false;
-    // Bumpers are already on the table from setup (or however the player
-    // last shuffled them with the flippers) — starting just locks them in.
     hud.setScore(score);
     hud.setLives(lives);
-    hud.setMessage('Press Space to launch');
+    hud.setMessage('Hold Down to charge the plunger, release to launch');
     restBallOnLaunchPad();
   }
 
@@ -253,16 +441,61 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       }
       return;
     }
-    hud.setMessage('Press Space to launch');
+    hud.setMessage('Hold Down to charge the plunger, release to launch');
     restBallOnLaunchPad();
   }
 
-  function launch() {
+  function launch(power = 1) {
     if (!launchReady) return;
     launchReady = false;
-    balls = [{ x: launchPad.x, y: launchPad.y, vx: (Math.random() - 0.5) * 20, vy: -LAUNCH_VELOCITY }];
+    charging = false;
+    charge = 0;
+    const velocity = LAUNCH_VELOCITY_MIN + (LAUNCH_VELOCITY - LAUNCH_VELOCITY_MIN) * Math.min(Math.max(power, 0), 1);
+    balls = [{ x: launchPad.x, y: launchPad.y, vx: (Math.random() - 0.5) * 20, vy: -velocity }];
     hud.setMessage(null);
   }
+
+  function startCharging() {
+    if (gameOver) startGame();
+    if (!launchReady) return;
+    charging = true;
+  }
+
+  function releasePlunger() {
+    if (!charging) return;
+    charging = false;
+    launch(charge);
+  }
+
+  function inLaneFoot(ball: Ball): boolean {
+    return ball.y >= 520 && ball.x > 312;
+  }
+
+  function kickBack(ball: Ball) {
+    ball.x = launchPad.x;
+    ball.y = launchPad.y;
+    ball.vx = (Math.random() - 0.5) * 20;
+    ball.vy = -LAUNCH_VELOCITY;
+    effects.push({ x: launchPad.x, y: launchPad.y - 10, colour: '#f87171', start: performance.now(), duration: 300, kind: 'ring', size: 6 });
+  }
+
+  /* A swallowed lone ball comes back out of one of the placed holes, fired
+     in a random direction. With no holes on the table it goes back to the
+     launch pad instead. */
+  function emergeFromHole() {
+    pendingRespawn = 0;
+    if (!holes.length) {
+      restBallOnLaunchPad();
+      hud.setMessage('Hold Down to charge the plunger, release to launch');
+      return;
+    }
+    const hole = holes[Math.floor(Math.random() * holes.length)];
+    const angle = Math.random() * Math.PI * 2;
+    balls.push({ x: hole.x, y: hole.y, vx: Math.cos(angle) * EMERGE_SPEED, vy: Math.sin(angle) * EMERGE_SPEED });
+    effects.push({ x: hole.x, y: hole.y, colour: '#f87171', start: performance.now(), duration: 420, kind: 'emerge', size: HOLE_RADIUS });
+  }
+
+  /* --- input ------------------------------------------------------- */
 
   function isTyping(target: EventTarget | null): target is HTMLElement {
     if (!(target instanceof HTMLElement)) return false;
@@ -278,53 +511,146 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     if (isTyping(event.target)) return;
     if (event.key === 'ArrowLeft' || event.key === 'z' || event.key === 'Z') {
       setFlipper('left', true);
-      if (gameOver) generateBumpers(); // reshuffle the table before committing with Space
       event.preventDefault();
     }
     if (event.key === 'ArrowRight' || event.key === '/' || event.key === 'x' || event.key === 'X') {
       setFlipper('right', true);
-      if (gameOver) generateBumpers();
       event.preventDefault();
     }
     if (event.key === ' ' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (gameOver) startGame();
-      else launch();
+      else launch(1);
+    }
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+      event.preventDefault();
+      if (!event.repeat) startCharging();
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      generateBumpers();
-      startGame();
+      if (selectedKind) selectKind(null);
+      else startGame();
     }
   }
 
   function onKeyup(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft' || event.key === 'z' || event.key === 'Z') setFlipper('left', false);
     if (event.key === 'ArrowRight' || event.key === '/' || event.key === 'x' || event.key === 'X') setFlipper('right', false);
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') releasePlunger();
+  }
+
+  function toLogical(event: PointerEvent | MouseEvent): Point {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * LOGICAL_W,
+      y: ((event.clientY - rect.top) / rect.height) * LOGICAL_H,
+    };
   }
 
   /* Touch/mouse: tap the left or right half of the table to work the nearer
      flipper, so the game is playable without a keyboard. */
-  function sideFromEvent(event: PointerEvent): 'left' | 'right' {
-    const rect = canvas.getBoundingClientRect();
-    return event.clientX - rect.left < rect.width / 2 ? 'left' : 'right';
+  function sideFromPoint(p: Point): 'left' | 'right' {
+    return p.x < LOGICAL_W / 2 ? 'left' : 'right';
   }
 
   const pointerSides = new Map<number, 'left' | 'right'>();
 
+  function updateCursor() {
+    let cursor = 'pointer';
+    if (selectedKind) cursor = 'crosshair';
+    else if (dragging) cursor = dragging.kind === 'resize' ? 'nwse-resize' : 'grabbing';
+    else if (hovered) cursor = 'bumper' in hovered && hovered.rim ? 'nwse-resize' : 'grab';
+    canvas.style.cursor = cursor;
+  }
+
   function onPointerDown(event: PointerEvent) {
+    canvas.focus({ preventScroll: true });
+    const p = toLogical(event);
+    // Placing: the armed item goes wherever the table is clicked, then the
+    // same press can be dragged straight on to move it.
+    if (selectedKind) {
+      if (selectedKind === 'hole') {
+        const hole = placeHole(p);
+        if (hole) dragging = { kind: 'hole', hole, dx: 0, dy: 0 };
+      } else {
+        dragging = { kind: 'move', bumper: placeBumper(selectedKind, p), dx: 0, dy: 0 };
+      }
+      selectKind(null);
+      if (dragging) canvas.setPointerCapture(event.pointerId);
+      else saveLayout();
+      updateCursor();
+      return;
+    }
+    const hit = itemAt(p);
+    if (hit) {
+      if ('hole' in hit) dragging = { kind: 'hole', hole: hit.hole, dx: hit.hole.x - p.x, dy: hit.hole.y - p.y };
+      else if (hit.rim) dragging = { kind: 'resize', bumper: hit.bumper };
+      else dragging = { kind: 'move', bumper: hit.bumper, dx: hit.bumper.x - p.x, dy: hit.bumper.y - p.y };
+      canvas.setPointerCapture(event.pointerId);
+      updateCursor();
+      return;
+    }
     if (gameOver) { startGame(); return; }
-    if (launchReady) { launch(); return; }
-    const side = sideFromEvent(event);
+    // Before a launch, holding the pointer anywhere charges the plunger.
+    if (launchReady) { startCharging(); return; }
+    const side = sideFromPoint(p);
     pointerSides.set(event.pointerId, side);
     setFlipper(side, true);
   }
 
+  function onPointerMove(event: PointerEvent) {
+    const p = toLogical(event);
+    if (dragging) {
+      if (dragging.kind === 'resize') {
+        // The rim follows the pointer.
+        dragging.bumper.radius = Math.hypot(p.x - dragging.bumper.x, p.y - dragging.bumper.y);
+        constrainBumper(dragging.bumper);
+      } else if (dragging.kind === 'move') {
+        dragging.bumper.x = p.x + dragging.dx;
+        dragging.bumper.y = p.y + dragging.dy;
+        constrainBumper(dragging.bumper);
+      } else {
+        dragging.hole.x = p.x + dragging.dx;
+        dragging.hole.y = p.y + dragging.dy;
+        constrainHole(dragging.hole);
+      }
+      return;
+    }
+    const over = itemAt(p);
+    const changed = !over || !hovered
+      ? over !== hovered
+      : 'hole' in over || 'hole' in hovered
+        ? ('hole' in over ? over.hole : null) !== ('hole' in hovered ? hovered.hole : null)
+        : over.bumper !== hovered.bumper || over.rim !== hovered.rim;
+    if (changed) {
+      hovered = over;
+      updateCursor();
+    }
+  }
+
   function onPointerUp(event: PointerEvent) {
+    if (dragging) {
+      dragging = null;
+      saveLayout();
+      updateCursor();
+      return;
+    }
+    if (charging) releasePlunger();
     const side = pointerSides.get(event.pointerId);
     if (side) setFlipper(side, false);
     pointerSides.delete(event.pointerId);
   }
+
+  function onDoubleClick(event: MouseEvent) {
+    const hit = itemAt(toLogical(event));
+    if (!hit) return;
+    if ('hole' in hit) removeHole(hit.hole);
+    else removeBumper(hit.bumper);
+    hovered = null;
+    updateCursor();
+  }
+
+  /* --- physics ----------------------------------------------------- */
 
   function updateFlippers(dt: number) {
     for (const flipper of flippers) {
@@ -375,7 +701,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
 
   /* Standard elastic bounce off a bumper, then a colour-specific tweak to
      the resulting speed/direction. Returns false if the ball wasn't
-     actually touching it. Life-cycle effects (remove/split/spawn) are left
+     actually touching it. Life-cycle effects (swallow/split/spawn) are left
      to the caller, since they need to reach into the ball list. */
   function bounceOffBumper(ball: Ball, bumper: Bumper): boolean {
     const dx = ball.x - bumper.x;
@@ -390,36 +716,21 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     ball.y += ny * overlap;
 
     const speed = Math.hypot(ball.vx, ball.vy);
-    switch (bumper.type) {
-      case 'grey': {
-        // Saps momentum so the ball loses the fight against gravity.
-        const damped = Math.min(speed * 0.5, 170);
-        ball.vx = nx * damped; ball.vy = ny * damped;
-        break;
-      }
-      case 'yellow': {
-        // A jolt in a fresh, unrelated direction.
-        const angle = Math.random() * Math.PI * 2;
-        const zapped = Math.max(speed, 420);
-        ball.vx = Math.cos(angle) * zapped; ball.vy = Math.sin(angle) * zapped;
-        break;
-      }
-      case 'green': {
-        const boosted = Math.max(speed * 1.25, 300);
-        ball.vx = nx * boosted; ball.vy = ny * boosted;
-        break;
-      }
-      default: {
-        // red / purple / pink still bounce normally; their extra effect is
-        // layered on by the caller.
-        const boosted = Math.max(speed * 1.1, 240);
-        ball.vx = nx * boosted; ball.vy = ny * boosted;
-      }
+    if (bumper.type === 'green') {
+      const boosted = Math.max(speed * 1.25, 300);
+      ball.vx = nx * boosted; ball.vy = ny * boosted;
+    } else {
+      // red / purple bounce normally; their extra effect is layered on by
+      // the caller.
+      const boosted = Math.max(speed * 1.1, 240);
+      ball.vx = nx * boosted; ball.vy = ny * boosted;
     }
 
     score += BUMPER_KINDS[bumper.type].score;
     hud.setScore(score);
-    bumper.flashUntil = performance.now() + 160;
+    const now = performance.now();
+    bumper.flashUntil = now + 160;
+    effects.push({ x: bumper.x, y: bumper.y, colour: BUMPER_KINDS[bumper.type].colour, start: now, duration: 380, kind: 'ring', size: bumper.radius });
     return true;
   }
 
@@ -437,119 +748,390 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     return ball.y > drain.y + BALL_RADIUS * 2 && ball.x > drain.left && ball.x < drain.right;
   }
 
+  function collideBall(ball: Ball) {
+    for (const wall of walls) resolveCircleSegment(ball, wall.a, wall.b, WALL_THICKNESS, 0.8);
+    if (gateClosed) resolveCircleSegment(ball, gate.a, gate.b, WALL_THICKNESS, 0.5);
+    for (const flipper of flippers) {
+      const tip = flipperTip(flipper);
+      const angularVelocity = flipperAngularVelocity(flipper);
+      const tipVelocity = { x: -Math.sin(flipper.angle) * angularVelocity * FLIPPER_LENGTH, y: Math.cos(flipper.angle) * angularVelocity * FLIPPER_LENGTH };
+      resolveCircleSegment(ball, flipper.pivot, tip, FLIPPER_RADIUS, 0.4, tipVelocity);
+    }
+  }
+
   function step(dt: number) {
-    updateFlippers(dt);
-    if (gameOver || launchReady) return;
+    const now = performance.now();
+    effects = effects.filter(e => now - e.start < e.duration);
+    gateAnim += ((gateClosed ? 1 : 0) - gateAnim) * Math.min(1, dt * 14);
+
+    if (gameOver || launchReady) {
+      updateFlippers(dt);
+      if (charging) charge = Math.min(1, charge + dt / CHARGE_SECONDS);
+      return;
+    }
+
+    if (pendingRespawn && now >= pendingRespawn) emergeFromHole();
 
     const removeAt = new Set<number>();
     const spawned: Ball[] = [];
 
-    for (let i = 0; i < balls.length; i++) {
-      const ball = balls[i];
-      ball.vy += GRAVITY * dt;
-      ball.x += ball.vx * dt;
-      ball.y += ball.vy * dt;
+    // Sub-step so that neither a ball nor a flipper tip moves more than
+    // MAX_STEP_DISTANCE between collision checks.
+    const tipSpeed = FLIPPER_ANGULAR_SPEED * FLIPPER_LENGTH;
+    let fastest = tipSpeed;
+    for (const ball of balls) fastest = Math.max(fastest, Math.hypot(ball.vx, ball.vy));
+    const substeps = Math.min(12, Math.max(1, Math.ceil((fastest * dt) / MAX_STEP_DISTANCE)));
+    const sub = dt / substeps;
 
-      for (const wall of walls) resolveCircleSegment(ball, wall.a, wall.b, WALL_THICKNESS, 0.8);
-      for (const flipper of flippers) {
-        const tip = flipperTip(flipper);
-        const angularVelocity = flipperAngularVelocity(flipper);
-        const tipVelocity = { x: -Math.sin(flipper.angle) * angularVelocity * FLIPPER_LENGTH, y: Math.cos(flipper.angle) * angularVelocity * FLIPPER_LENGTH };
-        resolveCircleSegment(ball, flipper.pivot, tip, FLIPPER_RADIUS, 0.4, tipVelocity);
-      }
+    for (let k = 0; k < substeps; k++) {
+      updateFlippers(sub);
+      for (let i = 0; i < balls.length; i++) {
+        if (removeAt.has(i)) continue;
+        const ball = balls[i];
+        ball.vy += GRAVITY * sub;
+        ball.x += ball.vx * sub;
+        ball.y += ball.vy * sub;
+        collideBall(ball);
 
-      for (const bumper of bumpers) {
-        if (performance.now() < bumper.cooldownUntil) continue;
-        if (!bounceOffBumper(ball, bumper)) continue;
-        bumper.cooldownUntil = performance.now() + BUMPER_COOLDOWN;
-        const ballsAfter = balls.length - removeAt.size + spawned.length;
-        if (bumper.type === 'red') {
-          if (ballsAfter > 1) {
+        for (const bumper of bumpers) {
+          if (now < bumper.cooldownUntil) continue;
+          if (!bounceOffBumper(ball, bumper)) continue;
+          bumper.cooldownUntil = now + BUMPER_COOLDOWN;
+          const ballsAfter = balls.length - removeAt.size + spawned.length;
+          if (bumper.type === 'red') {
+            // Swallowed. A lone ball is spat back out of a hole shortly.
             removeAt.add(i);
-          } else {
-            ball.x = respawn.x; ball.y = respawn.y; ball.vx = 0; ball.vy = 140;
+            effects.push({ x: bumper.x, y: bumper.y, colour: BUMPER_KINDS.red.colour, start: now, duration: 320, kind: 'swallow', size: bumper.radius + 6 });
+            if (ballsAfter <= 1) pendingRespawn = now + RESPAWN_DELAY;
+            break;
+          } else if (bumper.type === 'purple' && ballsAfter < MAX_BALLS) {
+            const angle = Math.atan2(ball.vy, ball.vx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * 0.3);
+            const speed = Math.max(Math.hypot(ball.vx, ball.vy), 260);
+            spawned.push({ x: ball.x, y: ball.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
           }
-        } else if (bumper.type === 'purple' && ballsAfter < MAX_BALLS) {
-          const angle = Math.atan2(ball.vy, ball.vx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * 0.3);
-          const speed = Math.max(Math.hypot(ball.vx, ball.vy), 260);
-          spawned.push({ x: ball.x, y: ball.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
-        } else if (bumper.type === 'pink') {
-          spawnRandomBumper();
         }
+        clampSpeed(ball);
       }
+    }
 
-      clampSpeed(ball);
+    for (let i = 0; i < balls.length; i++) {
+      if (removeAt.has(i)) continue;
+      const ball = balls[i];
       if (isDrained(ball)) removeAt.add(i);
+
+      // A ball that has come to rest at the foot of the lane is fired back up.
+      if (inLaneFoot(ball) && Math.hypot(ball.vx, ball.vy) < 40) {
+        const due = kickbacks.get(ball) ?? now + KICKBACK_DELAY;
+        kickbacks.set(ball, due);
+        if (now >= due) {
+          kickbacks.delete(ball);
+          kickBack(ball);
+        }
+      } else {
+        kickbacks.delete(ball);
+      }
     }
 
     if (removeAt.size) balls = balls.filter((_, i) => !removeAt.has(i));
     if (spawned.length) balls = balls.concat(spawned);
 
-    if (balls.length === 0) loseBall();
+    // The lane's flap shuts once every ball has left the lane.
+    const inLane = balls.some(b => b.x > 312 - BALL_RADIUS && b.y > gate.a.y - BALL_RADIUS - 2);
+    gateClosed = balls.length > 0 && !inLane;
+
+    if (balls.length === 0 && !pendingRespawn) loseBall();
+  }
+
+  /* --- drawing ----------------------------------------------------- */
+
+  function drawTable(now: number) {
+    // Felt: a deep blue radial wash with a vignette toward the rails.
+    const felt = ctx.createRadialGradient(180, 240, 30, 180, 300, 420);
+    felt.addColorStop(0, '#16224a');
+    felt.addColorStop(0.6, '#0d1533');
+    felt.addColorStop(1, '#05091b');
+    ctx.fillStyle = felt;
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+    // Soft coloured pools of light on the playfield.
+    for (const [x, y, r, colour] of [[FIELD_CX - 60, 170, 150, 'rgba(96,165,250,0.10)'], [FIELD_CX + 70, 330, 160, 'rgba(244,114,182,0.08)'], [FIELD_CX, 470, 140, 'rgba(52,211,153,0.07)']] as const) {
+      const pool = ctx.createRadialGradient(x, y, 0, x, y, r);
+      pool.addColorStop(0, colour);
+      pool.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pool;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+
+    // Faint lane markings.
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let y = 60; y < 470; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(30, y);
+      ctx.lineTo(296, y);
+      ctx.stroke();
+    }
+
+    // The launch lane, lit slightly differently.
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(314, 72, 30, 490);
+
+    // Drain: a dark slot between the flippers.
+    const drainGlow = ctx.createLinearGradient(0, 560, 0, 620);
+    drainGlow.addColorStop(0, 'rgba(0,0,0,0)');
+    drainGlow.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = drainGlow;
+    ctx.fillRect(drain.left, 560, drain.right - drain.left, 60);
+
+    // A row of lamps along the top curve that chase around.
+    for (let i = 0; i < 7; i++) {
+      const angle = Math.PI + (Math.PI * (i + 0.5)) / 7;
+      const x = 180 + Math.cos(angle) * 128;
+      const y = 78 + Math.sin(angle) * 44;
+      const lit = (Math.floor(now / 140) + i) % 7 === 0;
+      ctx.fillStyle = lit ? '#fde68a' : 'rgba(253,230,138,0.25)';
+      if (lit) {
+        ctx.shadowColor = '#fde68a';
+        ctx.shadowBlur = 12;
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function drawWalls() {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const [width, colour] of [[WALL_THICKNESS * 2 + 3, 'rgba(0,0,0,0.55)'], [WALL_THICKNESS * 2, '#8d9bb5'], [WALL_THICKNESS, '#dfe7f5']] as const) {
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      for (const wall of walls) {
+        ctx.moveTo(wall.a.x, wall.a.y);
+        ctx.lineTo(wall.b.x, wall.b.y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawHoles() {
+    for (const hole of holes) {
+      const pit = ctx.createRadialGradient(hole.x, hole.y - 2, 1, hole.x, hole.y, HOLE_RADIUS + 3);
+      pit.addColorStop(0, '#000000');
+      pit.addColorStop(0.7, '#05070f');
+      pit.addColorStop(1, 'rgba(60,70,110,0.9)');
+      ctx.fillStyle = pit;
+      ctx.beginPath();
+      ctx.arc(hole.x, hole.y, HOLE_RADIUS + 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(hole.x, hole.y, HOLE_RADIUS + 2.5, Math.PI * 0.9, Math.PI * 1.9);
+      ctx.stroke();
+      const active = (dragging && dragging.kind === 'hole' && dragging.hole === hole)
+        || (hovered !== null && 'hole' in hovered && hovered.hole === hole);
+      if (active) {
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, HOLE_RADIUS + 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  function drawBumper(bumper: Bumper, now: number) {
+    const kind = BUMPER_KINDS[bumper.type];
+    const flashing = bumper.flashUntil > now;
+    const active = (dragging && dragging.kind !== 'hole' && dragging.bumper === bumper)
+      || (hovered !== null && 'bumper' in hovered && hovered.bumper === bumper);
+
+    ctx.shadowColor = kind.colour;
+    ctx.shadowBlur = flashing ? 30 : 14;
+    ctx.fillStyle = flashing ? kind.colour : hexToRgba(kind.colour, 0.16);
+    ctx.beginPath();
+    ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    if (!flashing) {
+      const dome = ctx.createRadialGradient(bumper.x - bumper.radius * 0.35, bumper.y - bumper.radius * 0.4, 1, bumper.x, bumper.y, bumper.radius);
+      dome.addColorStop(0, 'rgba(255,255,255,0.28)');
+      dome.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+      dome.addColorStop(1, 'rgba(0,0,0,0.25)');
+      ctx.fillStyle = dome;
+      ctx.fill();
+    }
+
+    ctx.strokeStyle = kind.colour;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(bumper.x, bumper.y, Math.max(2, bumper.radius - 4), 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = flashing ? '#ffffff' : kind.colour;
+    ctx.beginPath();
+    ctx.arc(bumper.x, bumper.y, Math.max(2, bumper.radius * 0.22), 0, Math.PI * 2);
+    ctx.fill();
+
+    if (active) {
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(bumper.x, bumper.y, bumper.radius + 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   function drawFlipper(flipper: Flipper) {
     const tip = flipperTip(flipper);
     ctx.lineCap = 'round';
-    ctx.lineWidth = FLIPPER_RADIUS * 2;
+    ctx.lineWidth = FLIPPER_RADIUS * 2 + 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.beginPath();
     ctx.moveTo(flipper.pivot.x, flipper.pivot.y);
     ctx.lineTo(tip.x, tip.y);
     ctx.stroke();
+    const shade = ctx.createLinearGradient(flipper.pivot.x, flipper.pivot.y - FLIPPER_RADIUS, flipper.pivot.x, flipper.pivot.y + FLIPPER_RADIUS);
+    shade.addColorStop(0, '#f8fbff');
+    shade.addColorStop(1, '#8b98b3');
+    ctx.strokeStyle = shade;
+    ctx.lineWidth = FLIPPER_RADIUS * 2;
+    ctx.stroke();
+    ctx.strokeStyle = '#f87171';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#3b4560';
+    ctx.beginPath();
+    ctx.arc(flipper.pivot.x, flipper.pivot.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBall(ball: Point) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.arc(ball.x + 2, ball.y + 3, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    const chrome = ctx.createRadialGradient(ball.x - 2.5, ball.y - 2.5, 1, ball.x, ball.y, BALL_RADIUS);
+    chrome.addColorStop(0, '#ffffff');
+    chrome.addColorStop(0.35, '#dbe3f0');
+    chrome.addColorStop(1, '#3d4760');
+    ctx.fillStyle = chrome;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function plungerOffset(): number {
+    return (launchReady ? charge : 0) * PLUNGER_TRAVEL;
+  }
+
+  function drawPlunger() {
+    // The coils sit between the head and the fixed base at y=596 and bunch
+    // up as the head is pulled down.
+    const head = 558 + plungerOffset();
+    const coils = 6;
+    const pitch = (596 - head - 6) / coils;
+    ctx.strokeStyle = '#8d9bb5';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < coils; i++) {
+      const y = head + 6 + i * pitch;
+      ctx.moveTo(launchPad.x - 6, y);
+      ctx.lineTo(launchPad.x + 6, y + pitch / 2);
+    }
+    ctx.stroke();
+    ctx.fillStyle = charge > 0 ? '#fb923c' : '#f87171';
+    ctx.fillRect(launchPad.x - 8, head, 16, 6);
+    if (charging) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(launchPad.x + 11, 596 - 40 * charge, 3, 40 * charge);
+    }
+  }
+
+  function drawGate() {
+    // A flap hinged on the lane wall: hangs down inside the lane when open,
+    // swings up level with the lane top when shut.
+    const angle = (Math.PI / 2) * (1 - gateAnim);
+    ctx.save();
+    ctx.translate(gate.a.x, gate.a.y);
+    ctx.rotate(angle);
+    ctx.lineCap = 'round';
+    ctx.lineWidth = WALL_THICKNESS * 2;
+    ctx.strokeStyle = gateClosed ? '#f87171' : 'rgba(248,113,113,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(gate.b.x - gate.a.x - 2, 0);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#dfe7f5';
+    ctx.beginPath();
+    ctx.arc(gate.a.x, gate.a.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawEffects(now: number) {
+    for (const effect of effects) {
+      const t = Math.min(1, (now - effect.start) / effect.duration);
+      ctx.lineWidth = 2;
+      if (effect.kind === 'ring') {
+        ctx.strokeStyle = hexToRgba(effect.colour, 1 - t);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size + t * 26, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (effect.kind === 'swallow') {
+        ctx.strokeStyle = hexToRgba(effect.colour, 1 - t);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * (1 - t)), 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = hexToRgba(effect.colour, 1 - t);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size + t * 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = hexToRgba(effect.colour, 0.5 * (1 - t));
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const d = effect.size + t * 40;
+          ctx.beginPath();
+          ctx.arc(effect.x + Math.cos(a) * d, effect.y + Math.sin(a) * d, 2.5 * (1 - t) + 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
   }
 
   function draw() {
-    const styles = getComputedStyle(document.documentElement);
-    const ink = styles.getPropertyValue('--ink').trim();
-    const paper = styles.getPropertyValue('--paper').trim();
-    const grey = styles.getPropertyValue('--grey').trim();
-
-    ctx.fillStyle = paper;
-    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = WALL_THICKNESS;
-    ctx.lineCap = 'round';
-    for (const wall of walls) {
-      ctx.beginPath();
-      ctx.moveTo(wall.a.x, wall.a.y);
-      ctx.lineTo(wall.b.x, wall.b.y);
-      ctx.stroke();
-    }
-
-    // The respawn ring — where a lone ball reappears after a red bumper.
-    ctx.strokeStyle = grey;
-    ctx.setLineDash([3, 3]);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(respawn.x, respawn.y, respawn.radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
     const now = performance.now();
-    for (const bumper of bumpers) {
-      const flashing = bumper.flashUntil > now;
-      const kind = BUMPER_KINDS[bumper.type];
-      ctx.fillStyle = flashing ? kind.colour : paper;
-      ctx.strokeStyle = kind.colour;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = ink;
+    drawTable(now);
+    drawHoles();
+    for (const bumper of bumpers) drawBumper(bumper, now);
+    drawEffects(now);
+    drawWalls();
+    drawGate();
+    drawPlunger();
     for (const flipper of flippers) drawFlipper(flipper);
 
     if (!gameOver) {
-      ctx.fillStyle = ink;
-      const ballsToDraw = launchReady ? [{ x: launchPad.x, y: launchPad.y }] : balls;
-      for (const ball of ballsToDraw) {
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const ballsToDraw = launchReady ? [{ x: launchPad.x, y: launchPad.y + plungerOffset() }] : balls;
+      for (const ball of ballsToDraw) drawBall(ball);
+    }
+
+    if (selectedKind) {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(selectedKind === 'hole' ? 'Click the table to dig a hole' : 'Click the table to place it', FIELD_CX, 500);
     }
   }
 
@@ -565,8 +1147,10 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('keyup', onKeyup);
   canvas.addEventListener('pointerdown', onPointerDown);
-  canvas.addEventListener('pointerdown', () => canvas.focus());
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('dblclick', onDoubleClick);
   window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
   // The desktop shell resizes this page by resizing the iframe it sits in,
   // which doesn't reliably fire a window 'resize' event — watch the canvas
   // box itself so the table keeps filling whatever room it's given.
@@ -579,20 +1163,26 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   // parent desktop (e.g. the ambient Snake) instead of ever reaching us.
   canvas.tabIndex = 0;
   try { window.focus(); canvas.focus({ preventScroll: true }); } catch (error) {}
-  generateBumpers();
+  loadLayout();
+  hud.setSelectedKind(null);
   hud.setMessage('Press Space to start');
   hud.setScore(0);
   hud.setLives(LIVES_START);
+  updateCursor();
   draw();
   animationFrame = requestAnimationFrame(tick);
 
   return {
+    selectKind,
     destroy() {
       window.removeEventListener('resize', resize);
       document.removeEventListener('keydown', onKeydown);
       document.removeEventListener('keyup', onKeyup);
       canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('dblclick', onDoubleClick);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
       resizeObserver?.disconnect();
       if (animationFrame != null) cancelAnimationFrame(animationFrame);
     },

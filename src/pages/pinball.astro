@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 <BaseLayout
   title="Pinball"
-  description="A small single-table pinball machine, built with canvas — no libraries."
+  description="A small single-table pinball machine, built with canvas — no libraries. Lay out the bumpers yourself."
   windowTitle="Pinball"
   wide
 >
@@ -15,19 +15,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <span class="pinball-high" id="pinball-high"></span>
     </div>
     <p class="game-message" id="pinball-message" role="status" aria-live="polite"></p>
-    <ul class="pinball-legend">
-      <li><span class="legend-dot" data-kind="grey"></span>Slows</li>
-      <li><span class="legend-dot" data-kind="green"></span>Speeds up</li>
-      <li><span class="legend-dot" data-kind="red"></span>Swallows / respawns</li>
-      <li><span class="legend-dot" data-kind="yellow"></span>Zaps random</li>
-      <li><span class="legend-dot" data-kind="purple"></span>Splits ball</li>
-      <li><span class="legend-dot" data-kind="pink"></span>Spawns obstacle</li>
+    <ul class="pinball-palette" id="pinball-palette" aria-label="Bumper palette. Pick a colour, then click the table to place it.">
+      <li><button type="button" data-kind="green" aria-pressed="false"><span class="legend-dot"></span>Speeds up</button></li>
+      <li><button type="button" data-kind="red" aria-pressed="false"><span class="legend-dot"></span>Swallows</button></li>
+      <li><button type="button" data-kind="purple" aria-pressed="false"><span class="legend-dot"></span>Splits</button></li>
+      <li><button type="button" data-kind="hole" aria-pressed="false"><span class="legend-dot"></span>Hole</button></li>
     </ul>
+    <p class="pinball-hint">Pick an item, then click the table to place it. Drag the middle to move, the rim to resize, double-click to remove. Swallowed balls come back out of a hole.</p>
     <div class="game-canvas-wrap pinball-canvas-wrap">
       <canvas
         id="pinball-canvas"
         class="game-canvas"
-        aria-label="Pinball table. Left arrow or Z for the left flipper, right arrow or X for the right flipper, space to launch or start, escape to restart with a reshuffled table."
+        aria-label="Pinball table. Left arrow or Z for the left flipper, right arrow or X for the right flipper. Hold down arrow to charge the plunger and release to launch, or press space for a full-power launch. Escape restarts. Green bumpers speed the ball up, purple ones split it, and red ones swallow it so it reappears from one of the holes."
       ></canvas>
     </div>
   </section>
@@ -36,9 +35,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <style is:global>
   /* Shared .game-stage / .game-hud / .game-canvas rules live in
      global.css; this page only fixes its own canvas's shape, plus its
-     slightly busier HUD (score, lives, high score) and colour key. The
-     table itself has no width cap — it fills whatever room the window
-     gives it once the HUD/message/legend above have taken their share
+     slightly busier HUD (score, lives, high score) and the bumper palette.
+     The table itself has no width cap — it fills whatever room the window
+     gives it once the HUD/message/palette above have taken their share
      (.game-canvas-wrap is the flexible one, from global.css). */
   .pinball-hud {
     width: 100%;
@@ -55,16 +54,20 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     color: var(--muted);
   }
 
-  .pinball-canvas-wrap .game-canvas { aspect-ratio: 360 / 620; }
+  .pinball-canvas-wrap .game-canvas {
+    aspect-ratio: 360 / 620;
+    border-radius: 10px;
+    border-color: #3b4560;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  }
 
-  /* Colour key for the obstacles, sat right above the table. Colours are
-     duplicated from BUMPER_KINDS in scripts/games/pinball.ts — keep the two
-     in sync if either changes. */
-  .pinball-legend {
+  /* Palette of bumper colours. Colours are duplicated from BUMPER_KINDS in
+     scripts/games/pinball.ts — keep the two in sync if either changes. */
+  .pinball-palette {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.2rem 0.7rem;
+    gap: 0.25rem 0.4rem;
     width: 100%;
     max-width: 560px;
     margin: 0;
@@ -72,41 +75,73 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     list-style: none;
     font-family: var(--font-ui);
     font-size: 0.7rem;
-    color: var(--muted);
   }
 
-  .pinball-legend li {
+  .pinball-palette button {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    font: inherit;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
     white-space: nowrap;
   }
 
-  .legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex: 0 0 auto;
+  .pinball-palette button:hover { color: var(--text); border-color: var(--ink); }
+
+  .pinball-palette button[aria-pressed="true"] {
+    color: var(--text);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
   }
 
-  .legend-dot[data-kind="grey"] { background: #9aa1a9; }
-  .legend-dot[data-kind="green"] { background: #22c55e; }
-  .legend-dot[data-kind="red"] { background: #ef4444; }
-  .legend-dot[data-kind="yellow"] { background: #eab308; }
-  .legend-dot[data-kind="purple"] { background: #a855f7; }
-  .legend-dot[data-kind="pink"] { background: #ec4899; }
+  .pinball-palette button.placed { color: var(--text); }
+
+  .pinball-palette .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    border: 2px solid var(--dot);
+    background: transparent;
+  }
+
+  .pinball-palette button.placed .legend-dot { background: var(--dot); }
+
+  .pinball-palette button[data-kind="green"] { --dot: #34d399; }
+  .pinball-palette button[data-kind="red"] { --dot: #f87171; }
+  .pinball-palette button[data-kind="purple"] { --dot: #c084fc; }
+  .pinball-palette button[data-kind="hole"] { --dot: #dfe7f5; }
+  .pinball-palette button[data-kind="hole"] .legend-dot { background: #05070f; }
+
+  .pinball-hint {
+    margin: 0;
+    max-width: 560px;
+    text-align: center;
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
 </style>
 
 <script>
-  import { createPinball } from '../scripts/games/pinball';
+  import { createPinball, type PlaceableKind } from '../scripts/games/pinball';
 
   const canvas = document.getElementById('pinball-canvas') as HTMLCanvasElement;
   const scoreEl = document.getElementById('pinball-score') as HTMLElement;
   const livesEl = document.getElementById('pinball-lives') as HTMLElement;
   const highEl = document.getElementById('pinball-high') as HTMLElement;
   const messageEl = document.getElementById('pinball-message') as HTMLElement;
+  const paletteButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('#pinball-palette button'));
 
-  createPinball(canvas, {
+  let selected: PlaceableKind | null = null;
+
+  const game = createPinball(canvas, {
     setScore(score) {
       scoreEl.textContent = String(score);
     },
@@ -119,5 +154,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     setMessage(text) {
       messageEl.textContent = text ?? '';
     },
+    setSelectedKind(kind) {
+      selected = kind;
+      for (const button of paletteButtons) {
+        button.setAttribute('aria-pressed', String(button.dataset.kind === kind));
+      }
+    },
+    setPlacedKinds(kinds) {
+      for (const button of paletteButtons) {
+        button.classList.toggle('placed', kinds.includes(button.dataset.kind as PlaceableKind));
+      }
+    },
   });
+
+  for (const button of paletteButtons) {
+    button.addEventListener('click', () => {
+      const kind = button.dataset.kind as PlaceableKind;
+      game.selectKind(selected === kind ? null : kind);
+    });
+  }
 </script>
