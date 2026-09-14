@@ -4,10 +4,14 @@ import ProjectLayout from '../../layouts/ProjectLayout.astro';
 
 export async function getStaticPaths() {
   const projects = await getCollection('projects');
-  return projects.map(project => ({
-    params: { slug: project.id },
-    props: { project },
-  }));
+  // Standalone apps (games, toys) are the whole experience — they don't get
+  // an Info/blog page of their own.
+  return projects
+    .filter(project => !project.data.standalone)
+    .map(project => ({
+      params: { slug: project.id },
+      props: { project },
+    }));
 }
 
 const { project } = Astro.props;

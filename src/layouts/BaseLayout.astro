@@ -63,12 +63,28 @@ const looseposts = allPosts.filter(post => !claimed.has(post.id)).sort(byDateDes
 
 /* ── Desktop ──
    Icons are server-rendered so they are real links for crawlers and for
-   anyone without JS; desktop.js takes them over and makes them draggable. */
-const deskIcons = projects.map(project => ({
+   anyone without JS; desktop.js takes them over and makes them draggable.
+   A project can pin its icon to a screen corner (games live bottom-right,
+   above Settings) instead of joining the normal top-left icon flow. */
+const deskIconHref = (project: (typeof projects)[number]) =>
+  project.data.standalone ? project.data.appUrl! : `/projects/${project.id}/`;
+
+const flowProjects = projects.filter(project => !project.data.pinned);
+const pinnedProjects = projects.filter(project => project.data.pinned);
+
+const deskIcons = flowProjects.map(project => ({
   id: project.id,
   name: project.data.name,
   icon: iconFor(project.id),
-  href: `/projects/${project.id}/`,
+  href: deskIconHref(project),
+}));
+
+const pinnedIcons = pinnedProjects.map(project => ({
+  id: project.id,
+  name: project.data.name,
+  icon: iconFor(project.id),
+  href: deskIconHref(project),
+  corner: project.data.pinned,
 }));
 
 /* Everything the window manager needs, as plain JSON. */
@@ -79,6 +95,7 @@ const desktopData = {
     tagline: project.data.tagline,
     appUrl: project.data.appUrl ?? null,
     icon: iconFor(project.id),
+    standalone: project.data.standalone,
   })),
   posts: allPosts.sort(byDateDesc).map(post => ({
     id: post.id,
@@ -99,7 +116,8 @@ const socialIcons = [
 
 /* Every glyph the script may need to clone at runtime. */
 const iconNames = [...new Set([
-  ...deskIcons.map(i => i.icon), 'app', 'doc', 'folder', 'settings', 'monogram',
+  ...deskIcons.map(i => i.icon), ...pinnedIcons.map(i => i.icon),
+  'app', 'doc', 'folder', 'settings', 'monogram',
   ...socialIcons.map(i => i.icon),
 ])];
 ---
@@ -281,9 +299,21 @@ const iconNames = [...new Set([
           <MacIcon name="settings" size={32} />
           <span class="desk-label">Settings</span>
         </li>
+        {pinnedIcons.filter(item => item.corner === 'br').map(item => (
+          <li class="desk-icon" data-id={item.id} data-corner="br" tabindex="0" role="button" aria-label={`Open ${item.name}`}>
+            <MacIcon name={item.icon as any} size={32} />
+            <span class="desk-label">{item.name}</span>
+          </li>
+        ))}
         {socialIcons.map(item => (
           <li class="desk-icon" data-id={item.id} data-href={item.href} data-corner="tr"
               tabindex="0" role="link" aria-label={`Open ${item.name}`}>
+            <MacIcon name={item.icon as any} size={32} />
+            <span class="desk-label">{item.name}</span>
+          </li>
+        ))}
+        {pinnedIcons.filter(item => item.corner === 'tr').map(item => (
+          <li class="desk-icon" data-id={item.id} data-corner="tr" tabindex="0" role="button" aria-label={`Open ${item.name}`}>
             <MacIcon name={item.icon as any} size={32} />
             <span class="desk-label">{item.name}</span>
           </li>
