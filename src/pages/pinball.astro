@@ -16,12 +16,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
     <p class="game-message" id="pinball-message" role="status" aria-live="polite"></p>
     <ul class="pinball-palette" id="pinball-palette" aria-label="Bumper palette. Pick a colour, then click the table to place it.">
-      <li><button type="button" data-kind="grey" aria-pressed="false"><span class="legend-dot"></span>Slows</button></li>
       <li><button type="button" data-kind="green" aria-pressed="false"><span class="legend-dot"></span>Speeds up</button></li>
       <li><button type="button" data-kind="red" aria-pressed="false"><span class="legend-dot"></span>Swallows</button></li>
-      <li><button type="button" data-kind="yellow" aria-pressed="false"><span class="legend-dot"></span>Zaps</button></li>
       <li><button type="button" data-kind="purple" aria-pressed="false"><span class="legend-dot"></span>Splits</button></li>
-      <li><button type="button" data-kind="pink" aria-pressed="false"><span class="legend-dot"></span>Spawns a hole</button></li>
       <li><button type="button" data-kind="hole" aria-pressed="false"><span class="legend-dot"></span>Hole</button></li>
     </ul>
     <p class="pinball-hint">Pick an item, then click the table to place it. Drag the middle to move, the rim to resize, double-click to remove. Swallowed balls come back out of a hole.</p>
@@ -29,7 +26,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <canvas
         id="pinball-canvas"
         class="game-canvas"
-        aria-label="Pinball table. Left arrow or Z for the left flipper, right arrow or X for the right flipper, space to launch or start, escape to restart. A red bumper swallows the ball and it reappears from one of the holes."
+        aria-label="Pinball table. Left arrow or Z for the left flipper, right arrow or X for the right flipper, space to launch or start, escape to restart. Green bumpers speed the ball up, purple ones split it, and red ones swallow it so it reappears from one of the holes."
       ></canvas>
     </div>
   </section>
@@ -116,12 +113,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   .pinball-palette button.placed .legend-dot { background: var(--dot); }
 
-  .pinball-palette button[data-kind="grey"] { --dot: #b0b8c4; }
   .pinball-palette button[data-kind="green"] { --dot: #34d399; }
   .pinball-palette button[data-kind="red"] { --dot: #f87171; }
-  .pinball-palette button[data-kind="yellow"] { --dot: #facc15; }
   .pinball-palette button[data-kind="purple"] { --dot: #c084fc; }
-  .pinball-palette button[data-kind="pink"] { --dot: #f472b6; }
   .pinball-palette button[data-kind="hole"] { --dot: #dfe7f5; }
   .pinball-palette button[data-kind="hole"] .legend-dot { background: #05070f; }
 
