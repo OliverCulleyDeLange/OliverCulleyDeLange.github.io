@@ -21,8 +21,14 @@ const GRAVITY = 780; // px/s^2
 const BALL_RADIUS = 7;
 const WALL_THICKNESS = 3;
 const MAX_SPEED = 1050;
+// Physics runs in sub-steps short enough that nothing moves more than this
+// far per step, so a fast ball can't skip straight through a wall.
+const MAX_STEP_DISTANCE = 4;
 const LIVES_START = 3;
-const LAUNCH_VELOCITY = 940;
+const LAUNCH_VELOCITY = 940; // a fully charged plunger
+const LAUNCH_VELOCITY_MIN = 420; // a tap
+const CHARGE_SECONDS = 1.1; // hold this long for full power
+const PLUNGER_TRAVEL = 22; // px the plunger head compresses at full charge
 const MAX_BALLS = 4;
 const HIGH_SCORE_KEY = 'odl-pinball-highscore';
 const LAYOUT_KEY = 'odl-pinball-layout';
@@ -226,6 +232,14 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   let holes: Point[] = [];
   // The ball waits at the foot of the lane and launches straight up it.
   const launchPad: Point = { x: 329, y: 545 };
+  // A one-way flap across the top of the lane: open while a ball is still
+  // in the lane, shut once it's out so nothing can drop back in.
+  const gate: Segment = { a: { x: 312, y: 72 }, b: { x: 346, y: 72 } };
+  let gateClosed = false;
+  let gateAnim = 0; // 0 open, 1 closed
+  // Plunger: hold Down (or the pointer) to compress it, release to fire.
+  let charging = false;
+  let charge = 0;
 
   // Bumpers may sit anywhere in the open field, clear of the walls, the
   // lane and the flipper area.
@@ -398,6 +412,8 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     kickbacks.clear();
     pendingRespawn = 0;
     launchReady = true;
+    charging = false;
+    charge = 0;
   }
 
   function startGame() {
@@ -406,7 +422,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     gameOver = false;
     hud.setScore(score);
     hud.setLives(lives);
-    hud.setMessage('Press Space to launch');
+    hud.setMessage('Hold Down to charge the plunger, release to launch');
     restBallOnLaunchPad();
   }
 
@@ -425,15 +441,30 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       }
       return;
     }
-    hud.setMessage('Press Space to launch');
+    hud.setMessage('Hold Down to charge the plunger, release to launch');
     restBallOnLaunchPad();
   }
 
-  function launch() {
+  function launch(power = 1) {
     if (!launchReady) return;
     launchReady = false;
-    balls = [{ x: launchPad.x, y: launchPad.y, vx: (Math.random() - 0.5) * 20, vy: -LAUNCH_VELOCITY }];
+    charging = false;
+    charge = 0;
+    const velocity = LAUNCH_VELOCITY_MIN + (LAUNCH_VELOCITY - LAUNCH_VELOCITY_MIN) * Math.min(Math.max(power, 0), 1);
+    balls = [{ x: launchPad.x, y: launchPad.y, vx: (Math.random() - 0.5) * 20, vy: -velocity }];
     hud.setMessage(null);
+  }
+
+  function startCharging() {
+    if (gameOver) startGame();
+    if (!launchReady) return;
+    charging = true;
+  }
+
+  function releasePlunger() {
+    if (!charging) return;
+    charging = false;
+    launch(charge);
   }
 
   function inLaneFoot(ball: Ball): boolean {
@@ -455,7 +486,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     pendingRespawn = 0;
     if (!holes.length) {
       restBallOnLaunchPad();
-      hud.setMessage('Press Space to launch');
+      hud.setMessage('Hold Down to charge the plunger, release to launch');
       return;
     }
     const hole = holes[Math.floor(Math.random() * holes.length)];
@@ -489,7 +520,11 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     if (event.key === ' ' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (gameOver) startGame();
-      else launch();
+      else launch(1);
+    }
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') {
+      event.preventDefault();
+      if (!event.repeat) startCharging();
     }
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -501,6 +536,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
   function onKeyup(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft' || event.key === 'z' || event.key === 'Z') setFlipper('left', false);
     if (event.key === 'ArrowRight' || event.key === '/' || event.key === 'x' || event.key === 'X') setFlipper('right', false);
+    if (event.key === 'ArrowDown' || event.key === 's' || event.key === 'S') releasePlunger();
   }
 
   function toLogical(event: PointerEvent | MouseEvent): Point {
@@ -555,7 +591,8 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       return;
     }
     if (gameOver) { startGame(); return; }
-    if (launchReady) { launch(); return; }
+    // Before a launch, holding the pointer anywhere charges the plunger.
+    if (launchReady) { startCharging(); return; }
     const side = sideFromPoint(p);
     pointerSides.set(event.pointerId, side);
     setFlipper(side, true);
@@ -598,6 +635,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       updateCursor();
       return;
     }
+    if (charging) releasePlunger();
     const side = pointerSides.get(event.pointerId);
     if (side) setFlipper(side, false);
     pointerSides.delete(event.pointerId);
@@ -710,49 +748,75 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     return ball.y > drain.y + BALL_RADIUS * 2 && ball.x > drain.left && ball.x < drain.right;
   }
 
+  function collideBall(ball: Ball) {
+    for (const wall of walls) resolveCircleSegment(ball, wall.a, wall.b, WALL_THICKNESS, 0.8);
+    if (gateClosed) resolveCircleSegment(ball, gate.a, gate.b, WALL_THICKNESS, 0.5);
+    for (const flipper of flippers) {
+      const tip = flipperTip(flipper);
+      const angularVelocity = flipperAngularVelocity(flipper);
+      const tipVelocity = { x: -Math.sin(flipper.angle) * angularVelocity * FLIPPER_LENGTH, y: Math.cos(flipper.angle) * angularVelocity * FLIPPER_LENGTH };
+      resolveCircleSegment(ball, flipper.pivot, tip, FLIPPER_RADIUS, 0.4, tipVelocity);
+    }
+  }
+
   function step(dt: number) {
-    updateFlippers(dt);
     const now = performance.now();
     effects = effects.filter(e => now - e.start < e.duration);
-    if (gameOver || launchReady) return;
+    gateAnim += ((gateClosed ? 1 : 0) - gateAnim) * Math.min(1, dt * 14);
+
+    if (gameOver || launchReady) {
+      updateFlippers(dt);
+      if (charging) charge = Math.min(1, charge + dt / CHARGE_SECONDS);
+      return;
+    }
 
     if (pendingRespawn && now >= pendingRespawn) emergeFromHole();
 
     const removeAt = new Set<number>();
     const spawned: Ball[] = [];
 
-    for (let i = 0; i < balls.length; i++) {
-      const ball = balls[i];
-      ball.vy += GRAVITY * dt;
-      ball.x += ball.vx * dt;
-      ball.y += ball.vy * dt;
+    // Sub-step so that neither a ball nor a flipper tip moves more than
+    // MAX_STEP_DISTANCE between collision checks.
+    const tipSpeed = FLIPPER_ANGULAR_SPEED * FLIPPER_LENGTH;
+    let fastest = tipSpeed;
+    for (const ball of balls) fastest = Math.max(fastest, Math.hypot(ball.vx, ball.vy));
+    const substeps = Math.min(12, Math.max(1, Math.ceil((fastest * dt) / MAX_STEP_DISTANCE)));
+    const sub = dt / substeps;
 
-      for (const wall of walls) resolveCircleSegment(ball, wall.a, wall.b, WALL_THICKNESS, 0.8);
-      for (const flipper of flippers) {
-        const tip = flipperTip(flipper);
-        const angularVelocity = flipperAngularVelocity(flipper);
-        const tipVelocity = { x: -Math.sin(flipper.angle) * angularVelocity * FLIPPER_LENGTH, y: Math.cos(flipper.angle) * angularVelocity * FLIPPER_LENGTH };
-        resolveCircleSegment(ball, flipper.pivot, tip, FLIPPER_RADIUS, 0.4, tipVelocity);
-      }
+    for (let k = 0; k < substeps; k++) {
+      updateFlippers(sub);
+      for (let i = 0; i < balls.length; i++) {
+        if (removeAt.has(i)) continue;
+        const ball = balls[i];
+        ball.vy += GRAVITY * sub;
+        ball.x += ball.vx * sub;
+        ball.y += ball.vy * sub;
+        collideBall(ball);
 
-      for (const bumper of bumpers) {
-        if (now < bumper.cooldownUntil) continue;
-        if (!bounceOffBumper(ball, bumper)) continue;
-        bumper.cooldownUntil = now + BUMPER_COOLDOWN;
-        const ballsAfter = balls.length - removeAt.size + spawned.length;
-        if (bumper.type === 'red') {
-          // Swallowed. A lone ball is spat back out of a random hole shortly.
-          removeAt.add(i);
-          effects.push({ x: bumper.x, y: bumper.y, colour: BUMPER_KINDS.red.colour, start: now, duration: 320, kind: 'swallow', size: bumper.radius + 6 });
-          if (ballsAfter <= 1) pendingRespawn = now + RESPAWN_DELAY;
-        } else if (bumper.type === 'purple' && ballsAfter < MAX_BALLS) {
-          const angle = Math.atan2(ball.vy, ball.vx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * 0.3);
-          const speed = Math.max(Math.hypot(ball.vx, ball.vy), 260);
-          spawned.push({ x: ball.x, y: ball.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
+        for (const bumper of bumpers) {
+          if (now < bumper.cooldownUntil) continue;
+          if (!bounceOffBumper(ball, bumper)) continue;
+          bumper.cooldownUntil = now + BUMPER_COOLDOWN;
+          const ballsAfter = balls.length - removeAt.size + spawned.length;
+          if (bumper.type === 'red') {
+            // Swallowed. A lone ball is spat back out of a hole shortly.
+            removeAt.add(i);
+            effects.push({ x: bumper.x, y: bumper.y, colour: BUMPER_KINDS.red.colour, start: now, duration: 320, kind: 'swallow', size: bumper.radius + 6 });
+            if (ballsAfter <= 1) pendingRespawn = now + RESPAWN_DELAY;
+            break;
+          } else if (bumper.type === 'purple' && ballsAfter < MAX_BALLS) {
+            const angle = Math.atan2(ball.vy, ball.vx) + (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4 + Math.random() * 0.3);
+            const speed = Math.max(Math.hypot(ball.vx, ball.vy), 260);
+            spawned.push({ x: ball.x, y: ball.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed });
+          }
         }
+        clampSpeed(ball);
       }
+    }
 
-      clampSpeed(ball);
+    for (let i = 0; i < balls.length; i++) {
+      if (removeAt.has(i)) continue;
+      const ball = balls[i];
       if (isDrained(ball)) removeAt.add(i);
 
       // A ball that has come to rest at the foot of the lane is fired back up.
@@ -770,6 +834,10 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
 
     if (removeAt.size) balls = balls.filter((_, i) => !removeAt.has(i));
     if (spawned.length) balls = balls.concat(spawned);
+
+    // The lane's flap shuts once every ball has left the lane.
+    const inLane = balls.some(b => b.x > 312 - BALL_RADIUS && b.y > gate.a.y - BALL_RADIUS - 2);
+    gateClosed = balls.length > 0 && !inLane;
 
     if (balls.length === 0 && !pendingRespawn) loseBall();
   }
@@ -964,17 +1032,52 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     ctx.fill();
   }
 
+  function plungerOffset(): number {
+    return (launchReady ? charge : 0) * PLUNGER_TRAVEL;
+  }
+
   function drawPlunger() {
+    // The coils sit between the head and the fixed base at y=596 and bunch
+    // up as the head is pulled down.
+    const head = 558 + plungerOffset();
+    const coils = 6;
+    const pitch = (596 - head - 6) / coils;
     ctx.strokeStyle = '#8d9bb5';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    for (let y = 566; y < 596; y += 5) {
+    for (let i = 0; i < coils; i++) {
+      const y = head + 6 + i * pitch;
       ctx.moveTo(launchPad.x - 6, y);
-      ctx.lineTo(launchPad.x + 6, y + 2.5);
+      ctx.lineTo(launchPad.x + 6, y + pitch / 2);
     }
     ctx.stroke();
-    ctx.fillStyle = '#f87171';
-    ctx.fillRect(launchPad.x - 8, 558, 16, 6);
+    ctx.fillStyle = charge > 0 ? '#fb923c' : '#f87171';
+    ctx.fillRect(launchPad.x - 8, head, 16, 6);
+    if (charging) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(launchPad.x + 11, 596 - 40 * charge, 3, 40 * charge);
+    }
+  }
+
+  function drawGate() {
+    // A flap hinged on the lane wall: hangs down inside the lane when open,
+    // swings up level with the lane top when shut.
+    const angle = (Math.PI / 2) * (1 - gateAnim);
+    ctx.save();
+    ctx.translate(gate.a.x, gate.a.y);
+    ctx.rotate(angle);
+    ctx.lineCap = 'round';
+    ctx.lineWidth = WALL_THICKNESS * 2;
+    ctx.strokeStyle = gateClosed ? '#f87171' : 'rgba(248,113,113,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(gate.b.x - gate.a.x - 2, 0);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#dfe7f5';
+    ctx.beginPath();
+    ctx.arc(gate.a.x, gate.a.y, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   function drawEffects(now: number) {
@@ -1015,11 +1118,12 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     for (const bumper of bumpers) drawBumper(bumper, now);
     drawEffects(now);
     drawWalls();
+    drawGate();
     drawPlunger();
     for (const flipper of flippers) drawFlipper(flipper);
 
     if (!gameOver) {
-      const ballsToDraw = launchReady ? [launchPad] : balls;
+      const ballsToDraw = launchReady ? [{ x: launchPad.x, y: launchPad.y + plungerOffset() }] : balls;
       for (const ball of ballsToDraw) drawBall(ball);
     }
 
