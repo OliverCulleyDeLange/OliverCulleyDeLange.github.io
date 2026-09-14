@@ -13,6 +13,9 @@
 
 const LOGICAL_W = 360;
 const LOGICAL_H = 620;
+// The playfield runs from the left wall (x = 14) to the launch lane wall
+// (x = 312); everything in it is laid out symmetrically about this line.
+const FIELD_CX = (14 + 312) / 2;
 
 const GRAVITY = 780; // px/s^2
 const BALL_RADIUS = 7;
@@ -120,13 +123,13 @@ interface Layout {
 
 const DEFAULT_LAYOUT: Layout = {
   bumpers: [
-    { type: 'green', x: 180, y: 150, radius: 20 },
-    { type: 'red', x: 120, y: 280, radius: 17 },
-    { type: 'purple', x: 240, y: 280, radius: 17 },
+    { type: 'green', x: FIELD_CX, y: 150, radius: 20 },
+    { type: 'red', x: FIELD_CX - 60, y: 280, radius: 17 },
+    { type: 'purple', x: FIELD_CX + 60, y: 280, radius: 17 },
   ],
   holes: [
-    { x: 90, y: 400 },
-    { x: 270, y: 400 },
+    { x: FIELD_CX - 90, y: 400 },
+    { x: FIELD_CX + 90, y: 400 },
   ],
 };
 
@@ -195,46 +198,45 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     { a: { x: 60, y: 14 }, b: { x: 300, y: 14 } },
     ...arcSegments({ x: 300, y: 60 }, 46, 270, 360),
     { a: { x: 346, y: 60 }, b: { x: 346, y: 600 } },
-    // A lane down each side, mirror images of one another. The ball is
-    // launched up the right one; a ball that drops into the foot of either
-    // gets kicked straight back up, so neither is a dead pocket.
-    { a: { x: 48, y: 560 }, b: { x: 48, y: 72 } },
+    // The launch lane down the right side: walls the plunger channel off
+    // from the playfield, so a freshly launched ball can only travel up and
+    // over the curved top. A ball that drops back into its foot is kicked
+    // straight back up, so it is never a dead pocket.
     { a: { x: 312, y: 560 }, b: { x: 312, y: 72 } },
-    // Guides sloping from each lane wall down to the nearer flipper's hinge
-    // so nothing can settle in the pockets beside the flippers.
-    { a: { x: 48, y: 480 }, b: { x: 92, y: 558 } },
-    { a: { x: 312, y: 480 }, b: { x: 268, y: 558 } },
+    // The playfield between the left wall and the lane is symmetrical about
+    // its own centre line (x = FIELD_CX): matching guides slope from each
+    // side down to the flipper hinges so nothing settles beside them.
+    { a: { x: 14, y: 480 }, b: { x: FIELD_CX - 88, y: 558 } },
+    { a: { x: 312, y: 480 }, b: { x: FIELD_CX + 88, y: 558 } },
   ];
 
   // Flippers hinge on the OUTER side and point in toward the centre gap at
   // rest, snapping up (still centre-ward) when fired — mirror images of
-  // each other around the table's centreline (x = 180).
+  // each other around the playfield's centreline.
   const flippers: Flipper[] = [
-    { pivot: { x: 92, y: 555 }, restAngle: deg(20), activeAngle: deg(-75), angle: 0, active: false, side: 'left' },
-    { pivot: { x: 268, y: 555 }, restAngle: deg(160), activeAngle: deg(255), angle: 0, active: false, side: 'right' },
+    { pivot: { x: FIELD_CX - 88, y: 555 }, restAngle: deg(20), activeAngle: deg(-75), angle: 0, active: false, side: 'left' },
+    { pivot: { x: FIELD_CX + 88, y: 555 }, restAngle: deg(160), activeAngle: deg(255), angle: 0, active: false, side: 'right' },
   ];
   flippers.forEach(flipper => { flipper.angle = flipper.restAngle; });
 
   // Where the ball drains if it slips between the resting flipper tips.
-  const drain = { left: 148, right: 212, y: 600 };
+  const drain = { left: FIELD_CX - 32, right: FIELD_CX + 32, y: 600 };
   // Holes the player has placed. A red bumper swallows the ball, and if it
   // was the last one in play it pops back out of one of these at random.
   let holes: Point[] = [];
-  // The ball waits at the foot of a lane and launches straight up it. It
-  // starts in the right one; a lane's kicker relaunches from that lane.
-  const lanePads: Point[] = [{ x: 31, y: 545 }, { x: 329, y: 545 }];
-  let launchPad: Point = lanePads[1];
+  // The ball waits at the foot of the lane and launches straight up it.
+  const launchPad: Point = { x: 329, y: 545 };
 
   // Bumpers may sit anywhere in the open field, clear of the walls, the
-  // lanes and the flipper area.
-  const field = { left: 48 + WALL_THICKNESS, right: 312 - WALL_THICKNESS, top: 14 + WALL_THICKNESS, bottom: 468 };
+  // lane and the flipper area.
+  const field = { left: 14 + WALL_THICKNESS, right: 312 - WALL_THICKNESS, top: 14 + WALL_THICKNESS, bottom: 468 };
 
   let bumpers: Bumper[] = [];
   let balls: Ball[] = [];
   let effects: Effect[] = [];
   let launchReady = false;
   let pendingRespawn = 0;
-  // Balls resting at the foot of a lane, keyed by ball, with when to kick.
+  // Balls resting at the foot of the lane, keyed by ball, with when to kick.
   const kickbacks = new Map<Ball, number>();
 
   let score = 0;
@@ -395,7 +397,6 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     balls = [];
     kickbacks.clear();
     pendingRespawn = 0;
-    launchPad = lanePads[1];
     launchReady = true;
   }
 
@@ -435,20 +436,16 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     hud.setMessage(null);
   }
 
-  /* Which lane's foot a ball is resting in, if any. */
-  function laneFootOf(ball: Ball): Point | null {
-    if (ball.y < 520) return null;
-    if (ball.x < 48) return lanePads[0];
-    if (ball.x > 312) return lanePads[1];
-    return null;
+  function inLaneFoot(ball: Ball): boolean {
+    return ball.y >= 520 && ball.x > 312;
   }
 
-  function kickBack(ball: Ball, pad: Point) {
-    ball.x = pad.x;
-    ball.y = pad.y;
+  function kickBack(ball: Ball) {
+    ball.x = launchPad.x;
+    ball.y = launchPad.y;
     ball.vx = (Math.random() - 0.5) * 20;
     ball.vy = -LAUNCH_VELOCITY;
-    effects.push({ x: pad.x, y: pad.y - 10, colour: '#f87171', start: performance.now(), duration: 300, kind: 'ring', size: 6 });
+    effects.push({ x: launchPad.x, y: launchPad.y - 10, colour: '#f87171', start: performance.now(), duration: 300, kind: 'ring', size: 6 });
   }
 
   /* A swallowed lone ball comes back out of one of the placed holes, fired
@@ -758,14 +755,13 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       clampSpeed(ball);
       if (isDrained(ball)) removeAt.add(i);
 
-      // A ball that has come to rest at the foot of a lane is fired back up.
-      const pad = laneFootOf(ball);
-      if (pad && Math.hypot(ball.vx, ball.vy) < 40) {
+      // A ball that has come to rest at the foot of the lane is fired back up.
+      if (inLaneFoot(ball) && Math.hypot(ball.vx, ball.vy) < 40) {
         const due = kickbacks.get(ball) ?? now + KICKBACK_DELAY;
         kickbacks.set(ball, due);
         if (now >= due) {
           kickbacks.delete(ball);
-          kickBack(ball, pad);
+          kickBack(ball);
         }
       } else {
         kickbacks.delete(ball);
@@ -790,7 +786,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     // Soft coloured pools of light on the playfield.
-    for (const [x, y, r, colour] of [[110, 170, 150, 'rgba(96,165,250,0.10)'], [250, 330, 160, 'rgba(244,114,182,0.08)'], [180, 470, 140, 'rgba(52,211,153,0.07)']] as const) {
+    for (const [x, y, r, colour] of [[FIELD_CX - 60, 170, 150, 'rgba(96,165,250,0.10)'], [FIELD_CX + 70, 330, 160, 'rgba(244,114,182,0.08)'], [FIELD_CX, 470, 140, 'rgba(52,211,153,0.07)']] as const) {
       const pool = ctx.createRadialGradient(x, y, 0, x, y, r);
       pool.addColorStop(0, colour);
       pool.addColorStop(1, 'rgba(0,0,0,0)');
@@ -804,13 +800,12 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     for (let y = 60; y < 470; y += 40) {
       ctx.beginPath();
       ctx.moveTo(30, y);
-      ctx.lineTo(300, y);
+      ctx.lineTo(296, y);
       ctx.stroke();
     }
 
-    // The lanes, lit slightly differently.
+    // The launch lane, lit slightly differently.
     ctx.fillStyle = 'rgba(255,255,255,0.04)';
-    ctx.fillRect(16, 72, 30, 490);
     ctx.fillRect(314, 72, 30, 490);
 
     // Drain: a dark slot between the flippers.
@@ -969,19 +964,17 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     ctx.fill();
   }
 
-  function drawPlungers() {
-    for (const pad of lanePads) {
-      ctx.strokeStyle = '#8d9bb5';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let y = 566; y < 596; y += 5) {
-        ctx.moveTo(pad.x - 6, y);
-        ctx.lineTo(pad.x + 6, y + 2.5);
-      }
-      ctx.stroke();
-      ctx.fillStyle = '#f87171';
-      ctx.fillRect(pad.x - 8, 558, 16, 6);
+  function drawPlunger() {
+    ctx.strokeStyle = '#8d9bb5';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let y = 566; y < 596; y += 5) {
+      ctx.moveTo(launchPad.x - 6, y);
+      ctx.lineTo(launchPad.x + 6, y + 2.5);
     }
+    ctx.stroke();
+    ctx.fillStyle = '#f87171';
+    ctx.fillRect(launchPad.x - 8, 558, 16, 6);
   }
 
   function drawEffects(now: number) {
@@ -1022,7 +1015,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
     for (const bumper of bumpers) drawBumper(bumper, now);
     drawEffects(now);
     drawWalls();
-    drawPlungers();
+    drawPlunger();
     for (const flipper of flippers) drawFlipper(flipper);
 
     if (!gameOver) {
@@ -1034,7 +1027,7 @@ export function createPinball(canvas: HTMLCanvasElement, hud: PinballHud) {
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
       ctx.font = 'bold 11px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(selectedKind === 'hole' ? 'Click the table to dig a hole' : 'Click the table to place it', 180, 500);
+      ctx.fillText(selectedKind === 'hole' ? 'Click the table to dig a hole' : 'Click the table to place it', FIELD_CX, 500);
     }
   }
 
