@@ -4,6 +4,7 @@ export const projectIcons: Record<string, string> = {
   'grvmkr': 'grvmkr',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',
+  'home-survey-levels': 'survey',
   'memory': 'memory',
   'six-second-scribbles': 'scribbles',
   'location-alarm': 'location-alarm',

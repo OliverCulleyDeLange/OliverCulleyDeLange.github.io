@@ -1,0 +1,397 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+/* ── Example report ──
+   A Level 2 report for a fictional 1890s terrace, plus what a Level 3 report
+   would add for the same house. Written to show the shape and depth of each
+   report, not copied from a real survey. */
+interface Line { k?: string; s: string }
+interface Section {
+  code: string;
+  name: string;
+  r2: number | null;   // Level 2 condition rating
+  r3: number | null;   // Level 3 rating after the fuller inspection
+  l2only?: boolean;
+  aside?: string;
+  l2: Line[];
+  l3: Line[];
+}
+
+const SECTIONS: Section[] = [
+  {
+    code: 'D2', name: 'Roof coverings', r2: 2, r3: 2,
+    l2: [
+      { s: 'The main roof is pitched and covered with natural slate.' },
+      { s: 'Several slates have slipped or are missing on the rear slope and there is moss growth to the front.' },
+      { s: 'Repair or replace the defective slates within 12 months to reduce the risk of water getting in. Obtain a quotation from a roofing contractor before you commit to purchase.' },
+    ],
+    l3: [
+      { k: 'Construction', s: 'Welsh slate on timber battens fixed with iron nails, apparently original (c.1890) with patch repairs in mismatched slate. No underlay is present, which is usual for the age.' },
+      { k: 'Inspection', s: 'From ground level with binoculars, from a 3m ladder at the rear, and from inside the roof space, where daylight shows through in three places.' },
+      { k: 'Cause', s: 'The slipped slates are consistent with corrosion of the original nails (“nail sickness”) rather than storm damage. Expect more to slip each winter.' },
+      { k: 'Options', s: '(a) Continue patch repairs, probably yearly. (b) Strip and re-cover on new battens and a breathable membrane, re-using sound slates. Given the age and spread of failures, (b) is likely to be cheaper over five to ten years.' },
+      { k: 'If left', s: 'Water will reach the roof timbers and the bedroom ceilings below.' },
+      { k: 'Timescale', s: 'Within 12 months. Check after storms in the meantime.' },
+      { k: 'Indicative cost', s: 'Patch repairs £600 to £900. Full re-cover £9,000 to £14,000 including scaffolding.' },
+    ],
+  },
+  {
+    code: 'D4', name: 'Main walls', r2: 2, r3: 2,
+    l2: [
+      { s: 'The main walls are of solid brick, about 230mm thick, with painted render to the front elevation.' },
+      { s: 'High moisture-meter readings were recorded at low level in the front reception room and hallway. Meter readings alone do not identify the source of moisture.' },
+      { s: 'The raised front path and render extending to ground level may be contributing. Ask a contractor experienced with traditional buildings to lower the path or improve drainage and stop the render short of the ground. This is not urgent, but deal with it before redecorating.' },
+    ],
+    l3: [
+      { k: 'Construction', s: 'Nine-inch solid brickwork in lime mortar with no cavity. No damp-proof course was found; a slate course may exist beneath the render but could not be confirmed.' },
+      { k: 'Inspection', s: 'The pattern of electrical moisture-meter readings was considered alongside the materials, external ground levels and visible condition. Readings were highest along the front wall between the bay and party wall and dropped to normal about 900mm above floor level.' },
+      { k: 'Cause', s: 'A concrete path has raised the outside ground level above where a damp-proof course would sit, and the render runs down to the ground, bridging it. Inside, gypsum plaster holds the moisture.' },
+      { k: 'Opinion', s: 'Common in houses of this age and not, in our opinion, a structural problem. A specialist damp-proofing report is not needed.' },
+      { k: 'Remedy', s: 'Lower the path or cut a gravel-filled drainage channel. Cut the render back to 150mm above ground. Let the wall dry over a summer, then replaster in lime or a renovating plaster. An injected chemical damp-proof course is not appropriate for lime-built walls.' },
+      { k: 'Timescale', s: 'Before you redecorate. Not urgent for moving in.' },
+      { k: 'Indicative cost', s: '£3,000 to £6,000 including replastering.' },
+    ],
+  },
+  {
+    code: 'E1', name: 'Roof structure', r2: 1, r3: 3,
+    l2: [
+      { s: 'The roof structure is traditional cut timber: rafters, purlins and ceiling joists.' },
+      { s: 'The roof space was entered from the landing hatch and inspected from the safe boarded area. Stored items and insulation limited access and what could be seen.' },
+      { s: 'No significant defects were seen. Insulation is present.' },
+    ],
+    l3: [
+      { k: 'Inspection', s: 'About 70% of the roof space was accessible after a small number of lightweight stored items were moved. Small corners of the mineral-wool insulation were lifted at the eaves and around the chimney.' },
+      { k: 'Findings', s: 'Daylight shows through the covering in three places (see D2) with dry staining to the rafters beneath. One purlin is propped by a later strut bearing on a ceiling joist rather than a wall: a common but poor alteration. The chimney breast has been removed below but the stack remains on a gallows bracket. Ask your legal adviser for the approval and support details; if these are unavailable, have a structural engineer inspect it before exchange.' },
+      { k: 'Remedy', s: 'Have a structural engineer design support for the purlin from a load-bearing wall.' },
+      { k: 'Timescale', s: 'Check the chimney support before exchange. Carry out the purlin work with the roof repairs.' },
+      { k: 'Indicative cost', s: '£1,200 to £2,000.' },
+    ],
+  },
+  {
+    code: 'E4', name: 'Floors', r2: 3, r3: 3,
+    l2: [
+      { s: 'The ground floors are of suspended timber construction. The first floor is timber.' },
+      { s: 'Some springiness was noted in the hallway floor.' },
+      { s: 'Fitted floor coverings were not lifted. The unfixed hatch under the stairs was opened and the subfloor viewed from the opening, but the joist ends could not be seen. Have a competent builder investigate the movement before you commit to purchase.' },
+    ],
+    l3: [
+      { k: 'Inspection', s: 'Fitted carpets were not lifted. The accessible under-stair void was entered and inspected by torch and inspection camera. It is about 450mm deep over bare earth.' },
+      { k: 'Findings', s: 'Two of the four front airbricks are blocked by the raised path (see D4), so ventilation is poor and the void smells musty. Joist ends bearing on the front wall read 28% WME and are soft when probed. Old wood-boring beetle holes on two joists; no fresh dust, so probably inactive.' },
+      { k: 'Cause', s: 'Poor ventilation combined with damp brickwork at the bearing. Directly related to the D4 defect.' },
+      { k: 'Remedy', s: 'Clear and add airbricks. Have a timber specialist splice or replace the affected joist ends. Treat for beetle only if activity is confirmed.' },
+      { k: 'Timescale', s: 'Urgent: before you move in, or within three months.' },
+      { k: 'Indicative cost', s: '£2,500 to £4,500.' },
+    ],
+  },
+  {
+    code: 'J', name: 'Property valuation', r2: null, r3: null, l2only: true,
+    aside: 'The standard RICS Level 3 service has no valuation. A market valuation can be commissioned separately.',
+    l2: [
+      { k: 'Market value', s: '£425,000 in its present condition, with vacant possession.' },
+      { k: 'Reinstatement cost', s: '£310,000. Use this figure for buildings insurance.' },
+      { s: 'The valuation assumes the defects noted in this report are reflected in the agreed price.' },
+    ],
+    l3: [],
+  },
+  {
+    code: 'L', name: 'What to do now', r2: null, r3: null,
+    l2: [
+      { s: 'Obtain quotations for the rating 3 items before legal commitment to purchase, and ask your legal adviser about the matters in section H.' },
+    ],
+    l3: [
+      { k: 'Urgent', s: 'E4 joist ends and airbricks: £2,500 to £4,500.' },
+      { k: 'Within 12 months', s: 'D2 roof re-cover: £9,000 to £14,000. D4 ground levels, render and replastering: £3,000 to £6,000.' },
+      { k: 'Before exchange', s: 'E1 chimney-stack support: obtain a structural engineer’s opinion if approval and design details are unavailable.' },
+      { k: 'Planned', s: 'E1 purlin support: £1,200 to £2,000.' },
+      { k: 'Total', s: 'Roughly £16,000 to £27,000 plus VAT. Use it to inform your offer, not as a quotation.' },
+      { s: 'Repair-cost estimates are not part of the standard Level 3 service. Agree this additional service when you instruct the surveyor.' },
+    ],
+  },
+];
+
+/* ── Which survey? ──
+   These mirror the property and client factors in RICS's consumer guidance
+   and the current Home survey standard. */
+const QUESTIONS = [
+  { id: 'age', label: 'Older or historic', why: 'RICS says Level 2 can suit some older homes, but the building and the surveyor’s experience matter. Homes built much before 1850 are specifically flagged as likely to make Level 2 inconclusive.' },
+  { id: 'size', label: 'Large or complex', why: 'More elements, levels and junctions need a more extensive inspection and a more detailed explanation.' },
+  { id: 'construction', label: 'Unusual construction', why: 'Traditional timber frame and other non-standard materials need property-specific knowledge and a detailed account of how they perform.' },
+  { id: 'condition', label: 'Run-down or neglected', why: 'RICS says Level 2 is unlikely to suit a property in neglected condition and may produce numerous referrals for further investigation.' },
+  { id: 'altered', label: 'Extensively extended or altered', why: 'RICS gives extensively extended and altered buildings as examples of complex properties that are unlikely to suit Level 2.' },
+  { id: 'works', label: 'You’re planning major work', why: 'RICS recommends Level 3 when you are planning major works and want a detailed assessment to inform repair or upgrading decisions.' },
+] as const;
+---
+<BaseLayout
+  title="Home Survey Levels"
+  description="What a RICS Level 3 home survey adds over a Level 2, shown on an example report, and a short guide to which one you need."
+  windowTitle="Home Survey Levels"
+  wide
+>
+  <article class="survey-levels">
+    <header class="intro">
+      <h1>Level 2 or Level 3?</h1>
+      <p class="lede">Two RICS home surveys of the same house. See exactly what the extra money buys, then work out which one you need.</p>
+      <p class="lede">Level 2 was previously called the <em>HomeBuyer Report</em>; Level 3 was the <em>RICS Building Survey</em>. Both are visual inspections. Level 3 is more extensive, but it does not automatically involve opening up the building fabric.</p>
+    </header>
+
+    <section aria-labelledby="report-h">
+      <h2 id="report-h">What Level 3 adds</h2>
+      <p class="section-lede">Below are selected extracts from an illustrative Level 2 survey and valuation for an 1890s mid-terrace. The green blocks show the greater inspection and reporting detail a Level 3 service could add.</p>
+
+      <div class="report">
+        <div class="rep-head">
+          <div>
+            <h3>RICS Home Survey – Level 2 (survey and valuation)</h3>
+            <p class="addr">14 Example Terrace, Anytown</p>
+            <p class="meta">Inspected 3 September 2026 · 1890s mid-terrace, solid brick, slate roof · Extracts from sections D, E, J and L</p>
+          </div>
+          <p class="rating-key">
+            <span><span class="chip r1">1</span> No repair needed</span>
+            <span><span class="chip r2">2</span> Defects to fix, not urgent</span>
+            <span><span class="chip r3">3</span> Serious or urgent</span>
+          </p>
+        </div>
+
+        {SECTIONS.map(sec => (
+          <section class="rs">
+            <div class="rs-head">
+              <span class="rs-code">{sec.code}</span>
+              <h3>{sec.name}</h3>
+              {sec.r2 !== null && (
+                <span class="rs-rating">Condition rating <span class={`chip r${sec.r2}`}>{sec.r2}</span></span>
+              )}
+              {sec.r2 === null && sec.l2only && (
+                <span class="rs-rating"><span class="l2only">This Level 2 option</span></span>
+              )}
+            </div>
+            {sec.l2.map(l => (
+              <p>{l.k ? <><b>{l.k}:</b> {l.s}</> : l.s}</p>
+            ))}
+            {sec.aside && <p class="aside">{sec.aside}</p>}
+            {sec.l3.length > 0 && (
+              <div class="l3">
+                <div class="l3-head">
+                  <span class="l3-chip">+ Level 3</span>
+                  {sec.r3 !== null && sec.r3 !== sec.r2 && (
+                    <span class="l3-rating">Rating after a fuller inspection <span class={`chip r${sec.r3}`}>{sec.r3}</span></span>
+                  )}
+                </div>
+                {sec.l3.map(l => (
+                  <p>{l.k ? <><b>{l.k}:</b> {l.s}</> : l.s}</p>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+    </section>
+
+    <section aria-labelledby="which-h">
+      <h2 id="which-h">Which one do I need?</h2>
+      <p class="section-lede">Tick anything that applies to the house you’re buying.</p>
+
+      <div class="helper">
+        <div class="helper-body">
+          <div>
+            <div class="questions" id="survey-questions">
+              {QUESTIONS.map(q => (
+                <label class="q">
+                  <input type="checkbox" data-label={q.label} />
+                  <span class="box" aria-hidden="true"></span>
+                  <span class="q-label">{q.label}<span class="tag">points to Level 3</span></span>
+                  <p class="q-why">{q.why}</p>
+                </label>
+              ))}
+            </div>
+            <div class="q-foot">
+              <p>A surveyor can confirm the right level before you book. <button type="button" id="survey-clear">Clear answers</button></p>
+            </div>
+          </div>
+
+          <div class="verdict" aria-live="polite">
+            <p class="verdict-eyebrow">Our suggestion</p>
+            <h3><span class="lvl" id="v-lvl">Level 2</span> <span id="v-tail">should do</span></h3>
+            <p id="v-body">A conventional property in reasonable condition, with a simple form and layout, is what RICS says Level 2 is most suitable for. Choose the survey-and-valuation version if you also want a market valuation and reinstatement figure.</p>
+            <div id="v-reasons-wrap" hidden>
+              <p class="reasons-head">Because you said</p>
+              <ul class="reasons" id="v-reasons"></ul>
+            </div>
+            <p class="tip" id="v-empty">Nothing ticked yet. If nothing above applies, Level 2 is the sensible default.</p>
+            <p class="tip">Whichever you book, tell the surveyor what worries you. Both levels can be steered.</p>
+          </div>
+        </div>
+        <div class="helper-foot"><span>Based on RICS guidance on when each level suits a property</span><span id="survey-status">0 of {QUESTIONS.length} ticked</span></div>
+      </div>
+    </section>
+
+    <div class="notes">
+      <p>The report text is illustrative and shows selected extracts, not a complete survey. It was written for a fictional 1890s terrace and was not copied from a real report. Surveyors vary; the <a href="https://www.rics.org/profession-standards/rics-standards-and-guidance/sector-standards/building-surveying-standards/home-surveys/home-survey-standards" rel="noopener" target="_blank">RICS Home survey standard</a> sets the minimum for each level, and the <a href="https://www.rics.org/consumer-guides/house-surveys-uk-the-costs-types-and-benefits-of-an-rics-home-survey" rel="noopener" target="_blank">RICS consumer guide</a> explains who each level suits.</p>
+      <p>The repair costs are fictional. RICS treats cost estimates as an optional service that must be agreed in advance and presented with limitations. None of this is property advice: ask a surveyor to recommend a level for the particular home and your plans.</p>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .survey-levels {
+    /* Page tokens. light-dark() follows the site's color-scheme, including the manual theme toggle. */
+    --add-bg: light-dark(#e3f3e6, #17301f);
+    --add-mark: light-dark(#1f7a3a, #6fd08c);
+    --r1: #2f8f46;
+    --r2: #e3a300;
+    --r3: #c9302c;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+  .survey-levels [hidden] { display: none !important; }
+
+  .intro { display: flex; flex-direction: column; gap: 0.25rem; }
+  .intro h1 { font-size: 2rem; line-height: 1.15; margin-bottom: 0.25rem; text-wrap: balance; }
+  .lede { color: var(--muted); margin: 0; max-width: 42em; }
+  h2 { font-size: 1.35rem; line-height: 1.2; margin: 0 0 0.35rem; text-wrap: balance; }
+  h3 { font-size: 1.05rem; margin: 0; }
+  .section-lede { color: var(--muted); margin: 0 0 1rem; max-width: 42em; }
+
+  /* ── Example report ── */
+  .report { border: 1px solid var(--border); padding: 1.5rem 1.75rem 1.75rem; display: flex; flex-direction: column; gap: 1.75rem; }
+  .rep-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem 2rem; align-items: start; border-bottom: 1px solid var(--border); padding-bottom: 1.1rem; }
+  .rep-head h3 { font-size: 1.15rem; line-height: 1.25; }
+  .rep-head .addr { margin: 0.2rem 0 0; font-size: 0.95rem; }
+  .rep-head .meta { margin: 0; font-size: 0.8rem; color: var(--muted); }
+  .rating-key { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; font-size: 0.78rem; color: var(--muted); }
+  .rating-key span { display: inline-flex; align-items: center; gap: 0.45rem; }
+  .rating-key .chip { width: 18px; height: 18px; font-size: 0.7rem; }
+
+  .rs { display: flex; flex-direction: column; gap: 0.6rem; }
+  .rs-head { display: flex; align-items: baseline; gap: 0.6rem 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--grey-light); padding-bottom: 0.4rem; }
+  .rs-code { font-family: var(--font-ui); -webkit-font-smoothing: none; font-size: 0.9rem; color: var(--muted); }
+  .rs-rating { margin-left: auto; display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  .rs p { margin: 0; font-size: 0.93rem; line-height: 1.55; max-width: 68ch; }
+  .rs p b { font-weight: 600; }
+  .l2only { display: inline-flex; align-items: center; font-family: var(--font-ui); -webkit-font-smoothing: none; font-size: 0.72rem; line-height: 1; padding: 0.25rem 0.45rem; border: 1px solid var(--muted); color: var(--muted); }
+  .rs .aside { font-size: 0.85rem; color: var(--muted); }
+
+  .l3 { margin-top: 0.35rem; padding: 0.85rem 1rem 0.95rem; background: var(--add-bg); border-left: 4px solid var(--add-mark); display: flex; flex-direction: column; gap: 0.55rem; }
+  .l3-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.15rem; }
+  .l3-chip { display: inline-flex; align-items: center; font-family: var(--font-ui); -webkit-font-smoothing: none; font-size: 0.78rem; line-height: 1; padding: 0.3rem 0.5rem; background: var(--add-mark); color: light-dark(#fff, #14171c); }
+  .l3-rating { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text); }
+
+  .chip {
+    display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none;
+    font-family: var(--font-ui); -webkit-font-smoothing: none; font-size: 0.85rem; color: #fff; border: 1px solid rgba(0, 0, 0, 0.35);
+  }
+  .chip.r1 { background: var(--r1); }
+  .chip.r2 { background: var(--r2); color: #1a1a1a; }
+  .chip.r3 { background: var(--r3); }
+
+  /* ── Which survey? ── */
+  .helper { border: 1px solid var(--border); }
+  .helper-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .questions { border-right: 1px solid var(--border); }
+  .q { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0.25rem 0.8rem; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--grey-light); cursor: pointer; position: relative; }
+  .q:last-child { border-bottom: 0; }
+  .q:hover { background: var(--panel); }
+  .q input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .q .box { width: 16px; height: 16px; border: 1px solid var(--border); background: var(--bg); position: relative; margin-top: 0.25rem; }
+  .q input:checked + .box::before,
+  .q input:checked + .box::after {
+    content: ''; position: absolute; left: -1px; top: 6px; width: 16px; height: 2px; background: var(--text); transform: rotate(45deg);
+  }
+  .q input:checked + .box::after { transform: rotate(-45deg); }
+  .q input:focus-visible + .box { outline: 2px solid var(--text); outline-offset: 2px; }
+  .q-label { font-size: 0.95rem; line-height: 1.35; grid-column: 2; }
+  .q-why { font-size: 0.8rem; color: var(--muted); line-height: 1.45; grid-column: 2; margin: 0; }
+  .tag { font-family: var(--font-mono); font-size: 0.66rem; color: var(--muted); margin-left: 0.4rem; white-space: nowrap; }
+  .q-foot { padding: 0.75rem 1.25rem; font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--grey-light); border-right: 1px solid var(--border); }
+  .q-foot p { margin: 0; }
+  .q-foot button { font: inherit; font-size: 0.8rem; background: none; border: 0; padding: 0; color: var(--text); text-decoration: underline; cursor: pointer; }
+
+  .verdict { padding: 1.25rem 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.9rem; background: var(--panel); }
+  .verdict-eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0; }
+  .verdict h3 { font-size: 1.5rem; line-height: 1.15; }
+  .verdict h3 .lvl { display: inline-block; padding: 0 0.4rem; background: var(--text); color: var(--bg); }
+  .verdict p { margin: 0; font-size: 0.93rem; }
+  .reasons-head { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 0.35rem; }
+  .reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; }
+  /* List items are created by the script, so they sit outside Astro's style scoping. */
+  .reasons :global(li) { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 0.6rem; align-items: baseline; }
+  .reasons :global(li)::before { content: ''; width: 10px; height: 10px; border: 1px solid var(--text); background: var(--bg); transform: translateY(1px); }
+  .reasons :global(li.strong)::before { background: var(--text); }
+  .tip { font-size: 0.85rem; color: var(--muted); }
+  .helper-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
+    border-top: 1px solid var(--border); padding: 0.4rem 1.25rem;
+    font-family: var(--font-ui); -webkit-font-smoothing: none; font-size: 0.8rem;
+  }
+
+  .notes { font-size: 0.85rem; color: var(--muted); max-width: 46em; display: flex; flex-direction: column; gap: 0.6rem; }
+  .notes p { margin: 0; }
+
+  @media (max-width: 720px) {
+    .survey-levels { gap: 2rem; }
+    .report { padding: 1.1rem 1rem 1.25rem; gap: 1.4rem; }
+    .rep-head { grid-template-columns: 1fr; }
+    .helper-body { grid-template-columns: 1fr; }
+    .questions, .q-foot { border-right: 0; }
+    .q-foot { border-bottom: 1px solid var(--border); }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .q { transition: background-color 80ms linear; }
+  }
+</style>
+
+<script>
+  const questions = document.getElementById('survey-questions') as HTMLElement;
+  const inputs = Array.from(questions.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+  const lvl = document.getElementById('v-lvl') as HTMLElement;
+  const tail = document.getElementById('v-tail') as HTMLElement;
+  const body = document.getElementById('v-body') as HTMLElement;
+  const reasonsWrap = document.getElementById('v-reasons-wrap') as HTMLElement;
+  const reasons = document.getElementById('v-reasons') as HTMLUListElement;
+  const empty = document.getElementById('v-empty') as HTMLElement;
+  const status = document.getElementById('survey-status') as HTMLElement;
+  const clear = document.getElementById('survey-clear') as HTMLButtonElement;
+
+  interface Verdict { lvl: string; tail: string; body: string }
+
+  function decide(selected: number): Verdict {
+    if (selected > 0) {
+      return {
+        lvl: 'Level 3', tail: 'worth discussing',
+        body: 'RICS points buyers towards Level 3 for large, older, run-down, unusual or altered properties, and when major works are planned. Ask a surveyor to confirm that it suits this particular property and your plans.',
+      };
+    }
+    return {
+      lvl: 'Level 2', tail: 'should do',
+      body: 'A conventional property in reasonable condition, with a simple form and layout, is what RICS says Level 2 is most suitable for. Choose the survey-and-valuation version if you also want a market valuation and reinstatement figure.',
+    };
+  }
+
+  function update() {
+    const on = inputs.filter(i => i.checked);
+    const v = decide(on.length);
+
+    lvl.textContent = v.lvl;
+    tail.textContent = v.tail;
+    body.textContent = v.body;
+
+    reasons.replaceChildren(...on.map(i => {
+      const li = document.createElement('li');
+      li.className = 'strong';
+      li.textContent = i.dataset.label ?? '';
+      return li;
+    }));
+    reasonsWrap.hidden = on.length === 0;
+    empty.hidden = on.length > 0;
+
+    status.textContent = `${on.length} of ${inputs.length} ticked`;
+  }
+
+  questions.addEventListener('change', update);
+  clear.addEventListener('click', () => {
+    inputs.forEach(i => { i.checked = false; });
+    update();
+  });
+  update();
+</script>
