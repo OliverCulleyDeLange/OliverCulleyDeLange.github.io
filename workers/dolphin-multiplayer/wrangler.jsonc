@@ -1,6 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "dolphin-olympics-realtime",
+  /* The "oliverdelange" Cloudflare account, whose workers.dev subdomain the
+     game's PRODUCTION_SERVER points at. Pinned so deploys never land on
+     another account the same login can see; wrangler prefers this over
+     CLOUDFLARE_ACCOUNT_ID. */
+  "account_id": "e07409ca802c44c917ffee7a4a97af1b",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
   "observability": { "enabled": true },
