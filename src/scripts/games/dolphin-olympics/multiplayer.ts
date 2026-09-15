@@ -22,8 +22,17 @@ import type { Anim } from './player';
 export type ConnectionStatus = 'offline' | 'connecting' | 'online';
 
 /* Draw other dolphins this far in the past so there is nearly always a
-   newer packet to interpolate towards. */
-const RENDER_DELAY_MS = 120;
+   newer packet to interpolate towards. Poses arrive roughly every 100 ms,
+   so this leaves about one packet's worth of slack for network jitter. */
+const RENDER_DELAY_MS = 200;
+/* When the next pose is later than that, carry on along the last known
+   velocity for at most this long before freezing in place. Long enough to
+   ride out a TCP retransmit without a visible stall, short enough not to
+   overshoot much when the dolphin has actually turned. */
+const EXTRAPOLATE_MAX_MS = 120;
+/* The sender's clock offset is the minimum over this many recent packets:
+   enough to have seen a quick one, few enough to follow clock drift. */
+const OFFSET_WINDOW = 32;
 /* A dolphin that has gone quiet for this long stays visible, but is shown
    frozen and grey with an AFK timer until it moves or disconnects. */
 export const AFK_AFTER_MS = 4_000;
@@ -68,6 +77,7 @@ export class RemotePlayer {
   chatText = '';
   chatUpdatedAt = 0;
   private readonly snapshots: Snapshot[] = [];
+  private readonly offsets: number[] = [];
 
   constructor(readonly id: string, profile: Profile) {
     this.profile = profile;
@@ -84,8 +94,25 @@ export class RemotePlayer {
   push(state: PlayerState, now: number): void {
     this.latest = state;
     this.lastSeen = now;
-    this.snapshots.push({ at: now, state });
+    const previous = this.snapshots[this.snapshots.length - 1];
+    const at = Math.max(this.placeOnTimeline(state, now), previous ? previous.at + 1 : 0);
+    this.snapshots.push({ at, state });
     if (this.snapshots.length > SNAPSHOTS) this.snapshots.shift();
+  }
+
+  /* WebSockets ride on TCP, so poses reach us in bursts and stalls rather
+     than at the steady rate they were sent: one lost segment holds back
+     everything behind it until the retransmit lands. Stamping poses on
+     arrival bakes all of that into the animation, which is what made the
+     other dolphins look smeared. Instead each pose carries the sender's
+     clock, and the smallest (arrival - sent) seen recently is the best
+     estimate of the offset between our clocks, because delay only ever
+     makes a packet later, never earlier. */
+  private placeOnTimeline(state: PlayerState, now: number): number {
+    if (!(state.ts > 0)) return now;
+    this.offsets.push(now - state.ts);
+    if (this.offsets.length > OFFSET_WINDOW) this.offsets.shift();
+    return state.ts + Math.min(...this.offsets);
   }
 
   pushChat(text: string, now: number): void {
@@ -109,20 +136,28 @@ export class RemotePlayer {
         break;
       }
     }
-    let mix = 1;
-    if (to.at > from.at) mix = Math.min(1, Math.max(0, (t - from.at) / (to.at - from.at)));
-    if (t >= to.at) {
-      from = to;
-      mix = 1;
-    }
     const a = from.state;
     const b = to.state;
+    const span = to.at - from.at;
+    const mix = span > 0 ? Math.min(1, Math.max(0, (t - from.at) / span)) : 1;
+    let x = lerp(a.x, b.x, mix);
+    let y = lerp(a.y, b.y, mix);
+    /* How far past the newest pose we are: negative while there is still
+       something to interpolate towards. */
+    const ahead = t - to.at;
+    if (ahead > 0 && span > 0) {
+      const carry = Math.min(ahead, EXTRAPOLATE_MAX_MS) / span;
+      x = b.x + (b.x - a.x) * carry;
+      y = b.y + (b.y - a.y) * carry;
+    }
     return {
-      x: lerp(a.x, b.x, mix),
-      y: lerp(a.y, b.y, mix),
+      x,
+      y,
       angle: lerpWrapped(a.a, b.a, mix, 360),
-      anim: ANIM_NAMES[latest.an] ?? 'moving',
-      frame: latest.f + Math.min(AFK_AFTER_MS, Math.max(0, now - this.lastSeen)) / STEP_MS,
+      anim: ANIM_NAMES[b.an] ?? 'moving',
+      /* The tail keeps time with the sender's frame counter, and stops
+         once they have gone quiet. */
+      frame: Math.max(0, b.f + Math.min(AFK_AFTER_MS, ahead) / STEP_MS),
       roll: lerpWrapped(a.r, b.r, mix, 1),
       glow: lerp(a.g, b.g, mix),
     };
@@ -217,11 +252,17 @@ export class RealtimeClient {
     this.send({ t: 'chat', text });
   }
 
-  destroy(): void {
-    this.closed = true;
+  /* Leave the room. Unlike destroy(), connect() works again afterwards.
+     Clearing `ws` before closing keeps the close event from scheduling a
+     reconnect; the server's close handler tells the others we have gone. */
+  disconnect(): void {
     if (this.reconnectTimer != null) window.clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.retryMs = 1000;
     const ws = this.ws;
     this.ws = null;
+    this.id = null;
+    this.introduced = false;
     this.stopPing();
     if (ws) {
       try {
@@ -230,6 +271,11 @@ export class RealtimeClient {
     }
     this.players.clear();
     this.setStatus('offline');
+  }
+
+  destroy(): void {
+    this.closed = true;
+    this.disconnect();
   }
 
   private handle(message: ServerMessage): void {

@@ -8,7 +8,12 @@
   "account_id": "e07409ca802c44c917ffee7a4a97af1b",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
-  "observability": { "enabled": true },
+  /* Every incoming pose is a Durable Object invocation, and by default each
+     one is written to Workers Logs: about ten log events a second per
+     player, which blows through the Free plan's 200k-a-day allowance in a
+     few player-hours. Nothing here needs a per-message log, so invocation
+     logs are off; console output would still show up if any were added. */
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
   /* One Durable Object per room. Players in the same room see each other's
      dolphins; the object itself is only a relay, the game simulates locally.
      SQLite-backed classes are the only kind allowed on the Workers Free plan. */
