@@ -4,21 +4,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 <BaseLayout
   title="Dolphin Olympics"
-  description="A tribute port of Alan Rawkins' Flash classic Dolphin Olympics 2 — two minutes to dive, launch, flip, roll, tailslide and ride star trails as high as the solar system will let you."
+  description="A tribute port of Alan Rawkins' Flash classic Dolphin Olympics 2 — two minutes to dive, launch, flip, roll, tailslide and ride star trails as high as the solar system will let you. Now with other people's dolphins swimming alongside yours."
   windowTitle="Dolphin Olympics"
   wide
 >
   <section class="game-stage dolphin-stage" aria-label="Dolphin Olympics">
+    <div id="dolphin-profile" class="dolphin-profile-root"></div>
     <div class="game-canvas-wrap dolphin-canvas-wrap">
       <canvas
         id="dolphin-canvas"
         class="game-canvas"
-        aria-label="Dolphin Olympics. Hold up or W to accelerate. Left and right, or A and D, turn underwater and spin in the air for flips. Down or S rolls for a corkscrew, and held as you surface starts a tailslide along the water; press up to pop off it. Escape pauses. Original game by Alan Rawkins. You have two minutes to score as many tricks as you can and climb as high as you dare."
+        aria-label="Dolphin Olympics. Hold the up arrow to accelerate. Left and right turn underwater and spin in the air for flips. Down rolls for a corkscrew, and held as you surface starts a tailslide along the water; press up to pop off it. Escape pauses. Type normally while swimming to talk above your dolphin. Original game by Alan Rawkins. You have two minutes to score as many tricks as you can and climb as high as you dare. Other players online swim in the same sea as ghosts with their name and flag."
       ></canvas>
     </div>
     <p class="dolphin-credit">
       A tribute port of <em>Dolphin Olympics 2</em>, the Flash game by Alan Rawkins &mdash;
       <a href="https://www.rawkins.com" target="_blank" rel="noopener">rawkins.com</a>.
+      Everyone online swims in the same sea; type while swimming to talk, or add <code>?room=yourname</code> to the URL for a private room.
     </p>
   </section>
 </BaseLayout>
@@ -38,11 +40,97 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   }
 
   .dolphin-credit a { color: var(--accent); }
+  .dolphin-credit code { font-size: 0.7rem; }
+
+  /* Name / flag / skin strip above the canvas. */
+  .dolphin-profile-root { width: 100%; max-width: 640px; }
+
+  .dolphin-profile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem 0.9rem;
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+
+  .dolphin-profile-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .dolphin-profile input,
+  .dolphin-profile select {
+    font: inherit;
+    color: var(--text);
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 0.15rem 0.35rem;
+    max-width: 10rem;
+  }
+
+  .dolphin-profile input { width: 9rem; }
+  .dolphin-profile select { max-width: 11rem; }
+
+  .dolphin-profile input:focus-visible,
+  .dolphin-profile select:focus-visible,
+  .dolphin-skin:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .dolphin-skins {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .dolphin-skins legend {
+    float: left;
+    padding: 0;
+    margin-right: 0.15rem;
+  }
+
+  .dolphin-skin {
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--skin-line);
+    background: linear-gradient(160deg, var(--skin-body) 0 58%, var(--skin-belly) 58%);
+    cursor: pointer;
+  }
+
+  .dolphin-skin[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .dolphin-status {
+    font-size: 0.75rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .dolphin-status[data-status='online'] { color: #1a9a4a; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .dolphin-status[data-status='online'] { color: #7ee2a0; }
+  }
+  :root[data-theme='dark'] .dolphin-status[data-status='online'] { color: #7ee2a0; }
 </style>
 
 <script>
   import { createDolphinOlympics } from '../scripts/games/dolphin-olympics';
 
   const canvas = document.getElementById('dolphin-canvas') as HTMLCanvasElement;
-  createDolphinOlympics(canvas);
+  createDolphinOlympics(canvas, { profileRoot: document.getElementById('dolphin-profile') });
 </script>

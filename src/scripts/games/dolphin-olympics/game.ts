@@ -1,4 +1,4 @@
-import { CX, CY, FPS, GRAVITY, WATER_FRICTION, deg, frames, normalize, rad, roundTo } from './constants';
+import { CX, CY, FPS, GRAVITY, PIXELS_PER_METRE, WATER_FRICTION, deg, frames, normalize, rad, roundTo } from './constants';
 import { Controller, type GameKey } from './controller';
 import { Fish, FrameTimer, type Collidable } from './creatures';
 import { Level } from './level';
@@ -263,11 +263,11 @@ export class DolphinGame {
   get stats(): GameStats {
     return {
       score: this.score,
-      longestJump: roundTo(this.longestJump / 50, 2),
-      highestJump: roundTo(this.highestJump / 50, 2),
+      longestJump: roundTo(this.longestJump / PIXELS_PER_METRE, 2),
+      highestJump: roundTo(this.highestJump / PIXELS_PER_METRE, 2),
       biggestSplash: roundTo(this.biggestSplash / 4, 2),
-      longestTailslide: roundTo(this.longestTailslide / 50, 2),
-      highestSpeed: roundTo((this.highestSpeed * FPS) / 50, 2),
+      longestTailslide: roundTo(this.longestTailslide / PIXELS_PER_METRE, 2),
+      highestSpeed: roundTo((this.highestSpeed * FPS) / PIXELS_PER_METRE, 2),
       biggestCombo: this.biggestCombo,
     };
   }

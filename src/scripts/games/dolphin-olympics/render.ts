@@ -1,10 +1,14 @@
-import { CX, H, W, rad } from './constants';
+import type { Profile } from '../../../../workers/dolphin-multiplayer/src/protocol';
+import { CX, CY, H, PIXELS_PER_METRE, W, rad } from './constants';
 import type { Fish, Seagull } from './creatures';
+import { flagEmoji } from './flags';
 import type { DolphinGame, GameStats } from './game';
 import { FLOOR2_Y, FLOOR3_Y, FLOOR_BASE_Y, FLOOR_Y, REEF_Y, SKY_TOP, WATER_HEIGHT, type Level, type Planet } from './level';
+import { AFK_AFTER_MS, CHAT_FADE_MS, CHAT_HOLD_MS, type ConnectionStatus, type RemotePlayer, type RemotePose } from './multiplayer';
 import type { Firework, Shadow } from './particles';
 import type { Anim, Player } from './player';
 import type { Ring } from './ring';
+import { CLASSIC_SKIN, skinById, type DolphinSkin } from './skins';
 
 /* Everything drawn to the canvas: the scrolling world, the creatures, the
    dolphin, the in-game HUD and the menus. All art here is drawn in code. */
@@ -20,6 +24,14 @@ export interface UIButton {
   h: number;
 }
 
+/* What the renderer needs to know about the other players. */
+export interface MultiplayerView {
+  status: ConnectionStatus;
+  room: string;
+  self: { profile: Profile; score: number; chatText: string; chatUpdatedAt: number };
+  others: RemotePlayer[];
+}
+
 export interface RenderState {
   screen: Screen;
   help: boolean;
@@ -30,6 +42,8 @@ export interface RenderState {
   stats: GameStats | null;
   frame: number;
   buttons: UIButton[];
+  skin: DolphinSkin;
+  multiplayer: MultiplayerView | null;
 }
 
 const FONT = '"Verdana", "Geneva", "DejaVu Sans", sans-serif';
@@ -114,7 +128,18 @@ export interface DolphinPose {
   glowBlur: number;
 }
 
-export function drawDolphin(ctx: CanvasRenderingContext2D, x: number, y: number, angleDeg: number, pose: DolphinPose, tint: string | null = null, alpha = 1): void {
+/* A tint flattens the whole dolphin to one colour (used for shadows); a
+   skin recolours it while keeping the belly, fins and eye. */
+export function drawDolphin(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angleDeg: number,
+  pose: DolphinPose,
+  tint: string | null = null,
+  alpha = 1,
+  skin: DolphinSkin = CLASSIC_SKIN
+): void {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rad(angleDeg));
@@ -148,10 +173,10 @@ export function drawDolphin(ctx: CanvasRenderingContext2D, x: number, y: number,
     ctx.shadowBlur = pose.glowBlur * 2.5;
   }
 
-  const body = tint ?? '#8fa3c2';
-  const back = tint ?? '#6f86a8';
-  const belly = tint ?? '#e9f1f8';
-  const line = tint ? tint : '#2f3e55';
+  const body = tint ?? skin.body;
+  const back = tint ?? skin.back;
+  const belly = tint ?? skin.belly;
+  const line = tint ?? skin.line;
 
   const bodyPath = (): void => {
     ctx.beginPath();
@@ -219,7 +244,7 @@ export function drawDolphin(ctx: CanvasRenderingContext2D, x: number, y: number,
   ctx.stroke();
 
   /* Pectoral fin over the body. */
-  ctx.fillStyle = tint ?? '#7c93b3';
+  ctx.fillStyle = tint ?? skin.fin;
   ctx.beginPath();
   ctx.moveTo(12, 8);
   ctx.quadraticCurveTo(8, 24, -2, 22);
@@ -233,6 +258,13 @@ export function drawDolphin(ctx: CanvasRenderingContext2D, x: number, y: number,
     ctx.moveTo(52, 3);
     ctx.quadraticCurveTo(44, 5, 36, 6);
     ctx.stroke();
+    /* Darker skins get a pale ring so the eye still reads. */
+    if (skin !== CLASSIC_SKIN) {
+      ctx.fillStyle = skin.belly;
+      ctx.beginPath();
+      ctx.arc(33, -3, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = '#1b2330';
     ctx.beginPath();
     ctx.arc(33, -3, 2.4, 0, Math.PI * 2);
@@ -241,12 +273,218 @@ export function drawDolphin(ctx: CanvasRenderingContext2D, x: number, y: number,
     ctx.beginPath();
     ctx.arc(33.8, -3.8, 0.9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#3b4a60';
+    ctx.fillStyle = skin === CLASSIC_SKIN ? '#3b4a60' : skin.line;
     ctx.beginPath();
     ctx.ellipse(12, -12, 2.2, 1.2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
+}
+
+/* --- other players -------------------------------------------------- */
+
+/* Flag and name, centred on x. The flag is an emoji, so it is filled
+   without the outline that would smear it. */
+function drawNameTag(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  profile: Profile,
+  align: 'left' | 'center' | 'right',
+  color = '#ffffff',
+  suffix = ''
+): number {
+  const flag = flagEmoji(profile.flag);
+  const label = profile.name + suffix;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  const nameWidth = ctx.measureText(label).width;
+  const flagWidth = flag ? ctx.measureText(flag).width + 4 : 0;
+  const total = flagWidth + nameWidth;
+  let start = x;
+  if (align === 'center') start = x - total / 2;
+  else if (align === 'right') start = x - total;
+  if (flag) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(flag, start, y);
+  }
+  outlinedText(ctx, label, start + flagWidth, y, color);
+  return total;
+}
+
+function chatAlpha(text: string, updatedAt: number, now: number): number {
+  if (!text) return 0;
+  const age = Math.max(0, now - updatedAt);
+  if (age <= CHAT_HOLD_MS) return 1;
+  return Math.max(0, 1 - (age - CHAT_HOLD_MS) / CHAT_FADE_MS);
+}
+
+function formatAfkDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function wrapChatLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const character of Array.from(text)) {
+    const next = line + character;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line.trim());
+      line = character.trimStart();
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line.trim());
+  return lines.filter(Boolean);
+}
+
+function drawChatBubble(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  text: string,
+  alpha: number
+): void {
+  if (!text || alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold 12px ${FONT}`;
+  const lines = wrapChatLines(ctx, text, 220);
+  if (!lines.length) {
+    ctx.restore();
+    return;
+  }
+  const padX = 10;
+  const padY = 7;
+  const lineHeight = 15;
+  const width = Math.max(...lines.map((line) => ctx.measureText(line).width)) + padX * 2;
+  const height = lines.length * lineHeight + padY * 2;
+  const above = y - height - 12 >= 8;
+  const bx = Math.min(W - width - 8, Math.max(8, x - width / 2));
+  const by = above ? y - height - 12 : Math.min(H - height - 8, y + 12);
+  const tailX = Math.min(bx + width - 12, Math.max(bx + 12, x));
+
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.strokeStyle = 'rgba(4,22,64,0.85)';
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, bx, by, width, height, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  if (above) {
+    ctx.moveTo(tailX - 5, by + height - 1);
+    ctx.lineTo(x, y);
+    ctx.lineTo(tailX + 5, by + height - 1);
+  } else {
+    ctx.moveTo(tailX - 5, by + 1);
+    ctx.lineTo(x, y);
+    ctx.lineTo(tailX + 5, by + 1);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#061d45';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i) => ctx.fillText(line, bx + padX, by + padY + i * lineHeight));
+  ctx.restore();
+}
+
+function drawRemoteDolphin(ctx: CanvasRenderingContext2D, level: Level, pose: RemotePose, player: RemotePlayer, now: number): void {
+  const profile = player.profile;
+  const sx = level.pm.x + pose.x;
+  const sy = level.bgY + pose.y;
+  const skin = skinById(profile.skin);
+  const inactiveFor = Math.max(0, now - player.lastSeen);
+  const isAfk = inactiveFor >= AFK_AFTER_MS;
+  const afkText = `AFK · ${formatAfkDuration(inactiveFor)}`;
+  const margin = 70;
+  if (sx > -margin && sx < W + margin && sy > -margin && sy < H + margin) {
+    drawDolphin(
+      ctx,
+      sx,
+      sy,
+      pose.angle,
+      { anim: pose.anim, frame: pose.frame, roll: pose.roll, glowAlpha: pose.glow, glowBlur: 2 + pose.glow * 6 },
+      isAfk ? '#8793a1' : null,
+      isAfk ? 0.62 : 0.92,
+      skin
+    );
+    ctx.font = `bold 11px ${FONT}`;
+    drawNameTag(ctx, sx, sy - 40, profile, 'center', isAfk ? '#c4ccd5' : '#ffffff');
+    if (isAfk) drawChatBubble(ctx, sx, sy - 48, afkText, 0.9);
+    else drawChatBubble(ctx, sx, sy - 48, player.chatText, chatAlpha(player.chatText, player.chatUpdatedAt, now));
+    return;
+  }
+  /* Off the stage: a marker pinned to the nearest edge so you can see
+     where everyone else is. */
+  ctx.save();
+  ctx.globalAlpha = isAfk ? 0.6 : 0.85;
+  const mx = Math.min(W - 14, Math.max(14, sx));
+  const my = Math.min(H - 50, Math.max(30, sy));
+  ctx.fillStyle = isAfk ? '#8793a1' : skin.body;
+  ctx.strokeStyle = isAfk ? '#4f5965' : skin.line;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(mx, my, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = `bold 10px ${FONT}`;
+  const distance = Math.round(Math.hypot(sx - CX, sy - CY) / PIXELS_PER_METRE);
+  const suffix = ` · ${distance}m`;
+  if (mx > W / 2) drawNameTag(ctx, mx - 9, my + 4, profile, 'right', '#e8f1ff', suffix);
+  else drawNameTag(ctx, mx + 9, my + 4, profile, 'left', '#e8f1ff', suffix);
+  if (isAfk) drawChatBubble(ctx, mx, my - 8, afkText, 0.9);
+  else drawChatBubble(ctx, mx, my - 8, player.chatText, chatAlpha(player.chatText, player.chatUpdatedAt, now));
+  ctx.restore();
+}
+
+function drawRemotePlayers(ctx: CanvasRenderingContext2D, level: Level, others: RemotePlayer[]): void {
+  if (!others.length) return;
+  const now = performance.now();
+  for (const other of others) {
+    const pose = other.sample(now);
+    if (pose) drawRemoteDolphin(ctx, level, pose, other, now);
+  }
+}
+
+/* Top-right corner: connection state, then everyone in the room by score. */
+function drawRoster(ctx: CanvasRenderingContext2D, view: MultiplayerView, inGame: boolean): void {
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold 11px ${FONT}`;
+  const right = W - 12;
+  let y = 20;
+  if (view.status !== 'online') {
+    const label = view.status === 'connecting' ? 'connecting…' : 'offline';
+    outlinedText(ctx, `○ ${label}`, right, y, '#bfe3ff');
+    return;
+  }
+  const count = view.others.length + 1;
+  outlinedText(ctx, `● ${count} dolphin${count === 1 ? '' : 's'} online · ${view.room}`, right, y, '#8ff0a4');
+  if (!inGame || !view.others.length) return;
+  const rows: { profile: Profile; score: number; self: boolean; playing: boolean }[] = [
+    { profile: view.self.profile, score: view.self.score, self: true, playing: true },
+    ...view.others.map((o) => ({ profile: o.profile, score: o.score, self: false, playing: o.playing })),
+  ];
+  rows.sort((a, b) => b.score - a.score);
+  for (const row of rows.slice(0, 8)) {
+    y += 16;
+    const color = row.self ? '#ffe27a' : row.playing ? '#ffffff' : '#9fb6cc';
+    const score = row.playing ? row.score.toLocaleString('en-GB') : 'menu';
+    ctx.font = `bold 11px ${FONT}`;
+    const scoreWidth = ctx.measureText(score).width;
+    ctx.textAlign = 'right';
+    outlinedText(ctx, score, right, y, color);
+    drawNameTag(ctx, right - scoreWidth - 8, y, row.profile, 'right', color);
+  }
 }
 
 /* --- world ---------------------------------------------------------- */
@@ -984,7 +1222,14 @@ function drawCollidables(ctx: CanvasRenderingContext2D, level: Level): void {
   }
 }
 
-export function drawWorld(ctx: CanvasRenderingContext2D, level: Level, player: Player | null, frame: number): void {
+export function drawWorld(
+  ctx: CanvasRenderingContext2D,
+  level: Level,
+  player: Player | null,
+  frame: number,
+  skin: DolphinSkin = CLASSIC_SKIN,
+  others: RemotePlayer[] = []
+): void {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);
   drawSky(ctx, level);
@@ -1006,14 +1251,24 @@ export function drawWorld(ctx: CanvasRenderingContext2D, level: Level, player: P
   drawParticles(ctx, level);
   drawClouds(ctx, level);
   drawCollidables(ctx, level);
+  drawRemotePlayers(ctx, level, others);
   if (player) {
-    drawDolphin(ctx, player.x, player.y, player.angle, {
-      anim: player.anim,
-      frame: player.stopped ? 0 : player.animFrame,
-      roll: player.rollPhase,
-      glowAlpha: player.glowAlpha,
-      glowBlur: player.glowBlur,
-    });
+    drawDolphin(
+      ctx,
+      player.x,
+      player.y,
+      player.angle,
+      {
+        anim: player.anim,
+        frame: player.stopped ? 0 : player.animFrame,
+        roll: player.rollPhase,
+        glowAlpha: player.glowAlpha,
+        glowBlur: player.glowBlur,
+      },
+      null,
+      1,
+      skin
+    );
   }
 }
 
@@ -1071,9 +1326,9 @@ function drawHud(ctx: CanvasRenderingContext2D, game: DolphinGame): void {
 }
 
 const HELP_LINES = [
-  ['Up / W', 'Accelerate. Speed builds while you hold it and bleeds off when you let go.'],
-  ['Left / Right (A / D)', 'Turn. Underwater this steers you; in the air it spins you for Front and Back Flips.'],
-  ['Down / S', 'Roll. In the air a full roll is a Corkscrew. Hold it as you surface to tailslide along the water.'],
+  ['Up', 'Accelerate. Speed builds while you hold it and bleeds off when you let go.'],
+  ['Left / Right', 'Turn. Underwater this steers you; in the air it spins you for Front and Back Flips.'],
+  ['Down', 'Roll. In the air a full roll is a Corkscrew. Hold it as you surface to tailslide along the water.'],
   ['Up while sliding', 'Pop off the slide and launch skyward.'],
   ['Escape', 'Pause.'],
 ];
@@ -1118,7 +1373,7 @@ function drawHelp(ctx: CanvasRenderingContext2D, buttons: UIButton[], hover: str
 function drawTitle(ctx: CanvasRenderingContext2D, state: RenderState): void {
   const { frame, buttons, hover, best, level } = state;
   const bob = Math.sin(frame * 0.06) * 6;
-  drawDolphin(ctx, 190, 250 + bob, -28, { anim: 'moving', frame, roll: 0, glowAlpha: 0.4, glowBlur: 6 });
+  drawDolphin(ctx, 190, 250 + bob, -28, { anim: 'moving', frame, roll: 0, glowAlpha: 0.4, glowBlur: 6 }, null, 1, state.skin);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.font = `bold 46px ${FONT}`;
@@ -1134,7 +1389,7 @@ function drawTitle(ctx: CanvasRenderingContext2D, state: RenderState): void {
   }
   ctx.textAlign = 'center';
   ctx.font = `bold 12px ${FONT}`;
-  outlinedText(ctx, 'Arrow keys or WASD to swim. Two minutes on the clock. Enter to start.', CX, 458, '#e8f1ff');
+  outlinedText(ctx, 'Arrow keys to swim. Type to chat. Two minutes on the clock. Enter to start.', CX, 458, '#e8f1ff');
   if (level.skyMode !== 'day') {
     ctx.font = `11px ${FONT}`;
     outlinedText(ctx, level.skyMode === 'night' ? 'Night swim.' : 'Evening swim.', CX, 440, '#bfe3ff');
@@ -1191,15 +1446,21 @@ function drawEnd(ctx: CanvasRenderingContext2D, state: RenderState): void {
 }
 
 export function render(ctx: CanvasRenderingContext2D, state: RenderState): void {
-  const { screen, game, level, help, buttons, hover } = state;
-  drawWorld(ctx, level, game ? game.player : null, state.frame);
+  const { screen, game, level, help, buttons, hover, multiplayer } = state;
+  drawWorld(ctx, level, game ? game.player : null, state.frame, state.skin, multiplayer?.others ?? []);
+  if (screen === 'game' && game && multiplayer) {
+    const { chatText, chatUpdatedAt } = multiplayer.self;
+    drawChatBubble(ctx, game.player.x, game.player.y - 48, chatText, chatAlpha(chatText, chatUpdatedAt, performance.now()));
+  }
   if (screen === 'title') {
     if (help) drawHelp(ctx, buttons, hover);
     else drawTitle(ctx, state);
+    if (multiplayer && !help) drawRoster(ctx, multiplayer, false);
     return;
   }
   if (!game) return;
   drawHud(ctx, game);
+  if (multiplayer && !help) drawRoster(ctx, multiplayer, true);
   for (const b of buttons) {
     if (b.id === 'ingame-menu') drawButton(ctx, b, hover === b.id);
   }
