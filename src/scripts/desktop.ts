@@ -56,7 +56,15 @@ const wins = new Map();
 let zTop = 20;
 let activeWin = null;
 let trashed = new Set(store.read('odl-trash', []));
+/* Filled by loadFolders() at boot, once the desktop icons exist to check
+   against; see the Folders section. */
+let folders = [];
 let restoringSession = false;
+
+/* Touch has no right button: holding still on the desktop, an icon or a
+   folder row opens the same menu a right-click would. */
+const LONG_PRESS_MS = 500;
+let holdTimer = null;
 
 /* ── helpers ───────────────────────────────────────────────── */
 
@@ -769,6 +777,348 @@ function openTrash(opts = {}) {
   openWindow({ id, title: 'Trash', kind: 'folder', icon: 'folder', node, size: { w: 420, h: 320 }, rect: opts.rect });
 }
 
+/* ── Folders ─────────────────────────────────────────────────
+   A folder is a desktop icon that holds other desktop icons. The site
+   ships some (data.folders); visitors add their own from the desktop's
+   right-click menu, rename them, and drag icons in and out. All of it is
+   kept in localStorage under odl-folders as nothing more than lists of
+   icon ids: the icons themselves stay server-rendered on the desktop and
+   are simply hidden while they are filed away. */
+
+const FOLDER_NAME_MAX = 40;
+const UNTITLED_FOLDER = 'untitled folder';
+
+function iconEl(id) {
+  return iconLayer.querySelector(`.desk-icon[data-id="${CSS.escape(id)}"]`);
+}
+
+/* The element for an icon that can be filed: a real icon that is not
+   itself a folder (no nesting, and the Blog folder counts as one). */
+function plainIconEl(id) {
+  if (typeof id !== 'string' || id === 'blog') return null;
+  const el = iconEl(id);
+  return el && !el.hasAttribute('data-folder') ? el : null;
+}
+
+function canNest(id) {
+  return Boolean(plainIconEl(id));
+}
+
+function cleanName(name, fallback) {
+  const trimmed = typeof name === 'string' ? name.trim().slice(0, FOLDER_NAME_MAX) : '';
+  return trimmed || fallback;
+}
+
+function loadFolders() {
+  const stored = store.read('odl-folders', null);
+  const saved = stored && stored.version === 1 && Array.isArray(stored.folders) ? stored.folders : [];
+  const builtin = new Map((data.folders || []).map(folder => [folder.id, folder]));
+  const out = [];
+  const claimed = new Set();
+
+  // An icon can only be in one place, so the first folder to claim it wins.
+  const adopt = (id, name, icon, items) => {
+    const clean = (Array.isArray(items) ? items : []).filter(item =>
+      !claimed.has(item) && !trashed.has(item) && canNest(item));
+    clean.forEach(item => claimed.add(item));
+    out.push({ id, name, icon, items: clean });
+  };
+
+  // What the visitor saved comes first, including their edits to the
+  // folders that ship with the site.
+  saved.forEach(entry => {
+    if (!entry || typeof entry.id !== 'string') return;
+    if (out.some(folder => folder.id === entry.id)) return;
+    const base = builtin.get(entry.id);
+    // A saved id that names an ordinary icon would hide it: ignore it.
+    if (!base && iconEl(entry.id)) return;
+    adopt(entry.id, cleanName(entry.name, base?.name || UNTITLED_FOLDER), base?.icon || 'folder', entry.items);
+  });
+  // Site folders the visitor has never touched start with their defaults.
+  builtin.forEach(folder => {
+    if (out.some(item => item.id === folder.id)) return;
+    adopt(folder.id, folder.name, folder.icon, folder.items);
+  });
+  return out;
+}
+
+function persistFolders() {
+  store.write('odl-folders', {
+    version: 1,
+    folders: folders.map(folder => ({ id: folder.id, name: folder.name, items: folder.items })),
+  });
+  applyVisibility();
+  refreshFolderWindows();
+}
+
+function refreshFolderWindows() {
+  wins.forEach(win => {
+    win.body.querySelector('.folder-pane')?.dispatchEvent(new CustomEvent('odl:refresh'));
+  });
+}
+
+function folderOf(id) {
+  return folders.find(folder => folder.items.includes(id)) || null;
+}
+
+function fileIntoFolder(id, folderId) {
+  const folder = folders.find(item => item.id === folderId);
+  if (!folder || !canNest(id) || folder.items.includes(id)) return;
+  removeFromFolder(id);
+  folder.items.push(id);
+  persistFolders();
+}
+
+function removeFromFolder(id) {
+  const folder = folderOf(id);
+  if (folder) folder.items = folder.items.filter(item => item !== id);
+  return folder;
+}
+
+/* Take an icon out of its folder and back onto the desktop: where it was
+   dropped, or with no position wherever the icon flow has room. */
+function placeOnDesktop(id, pos) {
+  if (!removeFromFolder(id)) return;
+  const saved = store.read('odl-icons', {});
+  if (pos) saved[id] = { x: Math.round(pos.x), y: Math.round(pos.y) };
+  else delete saved[id];
+  store.write('odl-icons', saved);
+  persistFolders();
+  layoutIcons();
+}
+
+function trashIcon(id) {
+  removeFromFolder(id);
+  trashed.add(id);
+  persistFolders();
+  persistTrash();
+}
+
+/* The desktop icon for a folder: created for visitor-made folders, and
+   brought up to date (a rename, say) for the ones the server rendered. */
+function syncFolderIcon(folder) {
+  let el = iconEl(folder.id);
+  if (!el) {
+    el = document.createElement('li');
+    el.className = 'desk-icon';
+    el.dataset.id = folder.id;
+    el.dataset.folder = 'true';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    const label = document.createElement('span');
+    label.className = 'desk-label';
+    el.append(iconSvg(folder.icon), label);
+    // Visitor folders join the flow after the site's own icons, ahead of
+    // the corner pins so DOM order still reads top-left to bottom-right.
+    iconLayer.insertBefore(el, iconLayer.querySelector('.desk-icon[data-corner]'));
+  }
+  el.querySelector('.desk-label').textContent = folder.name;
+  el.setAttribute('aria-label', `Open ${folder.name}`);
+  return el;
+}
+
+function newFolderId() {
+  return 'folder-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* pos is in desktop coordinates: where the menu was opened. */
+async function createFolderAt(pos) {
+  const name = await askFolderName('New Folder', UNTITLED_FOLDER, 'Create');
+  if (name === null) return;
+  const folder = { id: newFolderId(), name: cleanName(name, UNTITLED_FOLDER), icon: 'folder', items: [] };
+  folders.push(folder);
+  const el = syncFolderIcon(folder);
+  wireIcon(el);
+  const { w, h } = deskRect();
+  el.style.left = clamp(Math.round(pos.x - el.offsetWidth / 2), 0, Math.max(0, w - el.offsetWidth)) + 'px';
+  el.style.top = clamp(Math.round(pos.y - 24), 0, Math.max(0, h - el.offsetHeight)) + 'px';
+  persistFolders();
+  persistIcons();
+  el.focus();
+}
+
+async function renameFolder(folder) {
+  const name = await askFolderName('Rename Folder', folder.name, 'Rename');
+  if (name === null) return;
+  const next = cleanName(name, folder.name);
+  if (next === folder.name) return;
+  folder.name = next;
+  syncFolderIcon(folder);
+  const win = wins.get('folder:' + folder.id);
+  if (win) {
+    win.title = next;
+    win.el.querySelector('.win-title').textContent = next;
+    win.el.setAttribute('aria-label', next);
+    syncDock();
+  }
+  persistFolders();
+}
+
+/* A Finder-style listing. Rows open on click and can be dragged back out
+   to the desktop, into another folder, or to the Trash. */
+function openFolder(folder, opts = {}) {
+  const id = 'folder:' + folder.id;
+  if (wins.has(id)) { const w = wins.get(id); restoreWin(w); focusWin(w); return; }
+
+  const node = document.createElement('div');
+  node.className = 'folder-list folder-pane';
+  const render = () => {
+    node.innerHTML = '';
+    const items = folder.items.map(iconMeta).filter(Boolean);
+    if (!items.length) {
+      node.innerHTML = '<p class="win-loading">This folder is empty. Drag icons onto it from the desktop.</p>';
+      return;
+    }
+    const head = document.createElement('div');
+    head.className = 'list-head';
+    head.innerHTML = '<span>Name</span><span>Kind</span>';
+    const ul = document.createElement('ul');
+    items.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'folder-item';
+      li.dataset.id = item.id;
+      li.tabIndex = 0;
+      li.setAttribute('role', 'button');
+      li.setAttribute('aria-label', `Open ${item.name}`);
+      const label = document.createElement('span');
+      label.className = 'post-title';
+      label.append(iconSvg(item.icon), document.createTextNode(item.name));
+      const kind = document.createElement('span');
+      kind.className = 'post-date';
+      kind.textContent = item.kind;
+      li.append(label, kind);
+      wireFolderItem(li);
+      ul.appendChild(li);
+    });
+    node.append(head, ul);
+  };
+  render();
+  node.addEventListener('odl:refresh', render);
+
+  openWindow({
+    id, title: folder.name, kind: 'folder', icon: folder.icon,
+    node, size: { w: 480, h: 360 }, rect: opts.rect,
+  });
+}
+
+/* The icon that follows the pointer while a row is dragged out of a folder. */
+function makeGhost(meta) {
+  const ghost = document.createElement('div');
+  ghost.className = 'desk-icon is-ghost';
+  const label = document.createElement('span');
+  label.className = 'desk-label';
+  label.textContent = meta.name;
+  ghost.append(iconSvg(meta.icon), label);
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
+function wireFolderItem(li) {
+  const id = li.dataset.id;
+  let moved = false;
+
+  li.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    moved = false;
+    const startX = e.clientX, startY = e.clientY;
+    let ghost = null;
+    let target = null;
+    li.setPointerCapture(e.pointerId);
+
+    const cancelHold = armHold(li, e, () => {
+      moved = true;
+      cleanup();
+      showFolderItemMenu(li, e.clientX, e.clientY);
+    });
+
+    const move = ev => {
+      if (!moved && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 4) {
+        moved = true;
+        cancelHold();
+        ghost = makeGhost(iconMeta(id));
+        li.classList.add('is-dragging');
+      }
+      if (!ghost) return;
+      ghost.style.left = (ev.clientX - ghost.offsetWidth / 2) + 'px';
+      ghost.style.top = (ev.clientY - 24) + 'px';
+      target = markDropTarget(ev, true);
+    };
+    const cleanup = () => {
+      cancelHold();
+      li.removeEventListener('pointermove', move);
+      li.removeEventListener('pointerup', up);
+      li.removeEventListener('pointercancel', up);
+      li.classList.remove('is-dragging');
+      ghost?.remove();
+      markDropTarget(null);
+    };
+    const up = ev => {
+      const dragging = Boolean(ghost);
+      const half = ghost ? ghost.offsetWidth / 2 : 0;
+      cleanup();
+      if (!dragging) return;
+      if (target?.type === 'trash') {
+        trashIcon(id);
+      } else if (target?.type === 'folder') {
+        fileIntoFolder(id, target.id);
+      } else if (ev.type === 'pointerup' && overDesktop(ev)) {
+        const d = desktop.getBoundingClientRect();
+        placeOnDesktop(id, { x: ev.clientX - d.left - half, y: ev.clientY - d.top - 24 });
+      }
+      // Dropped back inside a window: nothing happens.
+    };
+    li.addEventListener('pointermove', move);
+    li.addEventListener('pointerup', up);
+    li.addEventListener('pointercancel', up);
+  });
+
+  li.addEventListener('click', e => {
+    if (moved) { e.preventDefault(); return; }
+    activateItem(id);
+  });
+  li.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateItem(id); }
+  });
+}
+
+/* Name prompt for new and renamed folders. Resolves with the typed name,
+   or null when cancelled. */
+const folderDialog = document.getElementById('folder-dialog');
+const folderForm = document.getElementById('folder-form');
+const folderNameInput = document.getElementById('folder-name');
+let folderDialogResolve = null;
+
+function askFolderName(title, initial, okLabel) {
+  if (!folderDialog || !folderNameInput) return Promise.resolve(null);
+  closeFolderDialog(null);
+  folderDialog.querySelector('#folder-dialog-title').textContent = title;
+  folderDialog.querySelector('#folder-ok').textContent = okLabel;
+  folderNameInput.value = initial;
+  folderDialog.hidden = false;
+  folderNameInput.focus();
+  folderNameInput.select();
+  return new Promise(resolve => { folderDialogResolve = resolve; });
+}
+
+function closeFolderDialog(result) {
+  if (folderDialog) folderDialog.hidden = true;
+  const resolve = folderDialogResolve;
+  folderDialogResolve = null;
+  if (resolve) resolve(result);
+}
+
+folderForm?.addEventListener('submit', e => {
+  e.preventDefault();
+  closeFolderDialog(folderNameInput.value);
+});
+document.getElementById('folder-cancel')?.addEventListener('click', () => closeFolderDialog(null));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFolderDialog(null);
+});
+document.addEventListener('pointerdown', e => {
+  if (folderDialog && !folderDialog.hidden && !e.target.closest('#folder-dialog')) closeFolderDialog(null);
+}, true);
+
 async function restoreSessionWindow(entry) {
   const rect = restoredRect(entry.rect);
   let win;
@@ -781,6 +1131,9 @@ async function restoreSessionWindow(entry) {
     openBlogFolder({ rect });
   } else if (entry.id === 'folder:trash') {
     openTrash({ rect });
+  } else if (entry.id.startsWith('folder:')) {
+    const folder = folders.find(item => 'folder:' + item.id === entry.id);
+    if (folder) openFolder(folder, { rect });
   } else if (entry.id.startsWith('app:')) {
     const project = data.projects.find(item => item.id === entry.id.slice(4));
     if (project?.appUrl) {
@@ -833,19 +1186,22 @@ async function restoreWindowSession() {
   saveWindowSession();
 }
 
+/* What an icon id stands for, for listings in the Trash and in folders. */
 function iconMeta(id) {
-  if (id === 'blog') return { id: 'blog', name: 'Blog', icon: 'folder' };
-  if (id === 'settings') return { id: 'settings', name: 'Settings', icon: 'settings' };
-  if (id === 'cv') return { id: 'cv', name: 'CV', icon: 'doc' };
-  if (id === 'github') return { id: 'github', name: 'GitHub', icon: 'github' };
-  if (id === 'linkedin') return { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin' };
+  const folder = folders.find(item => item.id === id);
+  if (folder) return { id, name: folder.name, icon: folder.icon, kind: 'Folder' };
+  if (id === 'blog') return { id, name: 'Blog', icon: 'folder', kind: 'Folder' };
+  if (id === 'settings') return { id, name: 'Settings', icon: 'settings', kind: 'System' };
+  if (id === 'cv') return { id, name: 'CV', icon: 'doc', kind: 'Document' };
+  if (id === 'github') return { id, name: 'GitHub', icon: 'github', kind: 'Link' };
+  if (id === 'linkedin') return { id, name: 'LinkedIn', icon: 'linkedin', kind: 'Link' };
   const p = data.projects.find(x => x.id === id);
-  return p ? { id: p.id, name: p.name, icon: p.icon } : null;
+  return p ? { id: p.id, name: p.name, icon: p.icon, kind: 'Application' } : null;
 }
 
 function persistTrash() {
   store.write('odl-trash', [...trashed]);
-  applyTrash();
+  applyVisibility();
   // An icon put back still carries the inline position it was dropped on
   // (over the Trash), so re-apply the saved layout.
   layoutIcons();
@@ -853,9 +1209,11 @@ function persistTrash() {
   if (tw) tw.body.firstElementChild?.dispatchEvent(new CustomEvent('odl:refresh'));
 }
 
-function applyTrash() {
+/* An icon leaves the desktop when it is in the Trash or filed in a folder. */
+function applyVisibility() {
+  const filed = new Set(folders.flatMap(folder => folder.items));
   iconLayer.querySelectorAll('.desk-icon').forEach(el => {
-    el.hidden = trashed.has(el.dataset.id);
+    el.hidden = trashed.has(el.dataset.id) || filed.has(el.dataset.id);
   });
   dockTrash.classList.toggle('is-full', trashed.size > 0);
 }
@@ -869,9 +1227,10 @@ function layoutIcons() {
   const perCol = Math.max(1, Math.floor((h - pad) / rowH));
 
   // Flow icons fill columns from the top-left; corner pins keep shortcuts
-  // at their intended desktop edge.
+  // at their intended desktop edge. Icons in the Trash or in a folder are
+  // hidden and take no slot, so the flow closes up around them.
   const all = [...iconLayer.querySelectorAll('.desk-icon')];
-  const flow = all.filter(el => !el.dataset.corner);
+  const flow = all.filter(el => !el.dataset.corner && !el.hidden);
   const trPins = all.filter(el => el.dataset.corner === 'tr');
   const brPins = all.filter(el => el.dataset.corner === 'br');
 
@@ -936,62 +1295,143 @@ function activateIcon(el) {
   }
   if (id === 'blog') return openBlogFolder();
   if (id === 'settings') return openSettings();
+  const folder = folders.find(item => item.id === id);
+  if (folder) return openFolder(folder);
   const project = data.projects.find(p => p.id === id);
   if (project) openProject(project);
 }
 
+/* Open an icon by id, for rows inside a folder window: the icon element
+   is still on the desktop, just hidden. */
+function activateItem(id) {
+  const el = iconEl(id);
+  if (el) activateIcon(el);
+}
+
 function wireIcons() {
-  iconLayer.querySelectorAll('.desk-icon').forEach(el => {
-    let moved = false;
+  iconLayer.querySelectorAll('.desk-icon').forEach(wireIcon);
+}
 
-    el.addEventListener('pointerdown', e => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      moved = false;
-      const startX = e.clientX, startY = e.clientY;
-      const origX = el.offsetLeft, origY = el.offsetTop;
-      el.setPointerCapture(e.pointerId);
-      el.classList.add('is-dragging');
+function wireIcon(el) {
+  let moved = false;
 
-      const move = ev => {
-        if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 4) moved = true;
-        if (!moved) return;
-        const { w, h } = deskRect();
-        el.style.left = clamp(origX + ev.clientX - startX, 0, w - el.offsetWidth) + 'px';
-        el.style.top = clamp(origY + ev.clientY - startY, 0, h - el.offsetHeight) + 'px';
-        dockTrash.classList.toggle('is-target', overTrash(ev));
-      };
-      const up = ev => {
-        el.removeEventListener('pointermove', move);
-        el.removeEventListener('pointerup', up);
-        el.removeEventListener('pointercancel', up);
-        el.classList.remove('is-dragging');
-        dockTrash.classList.remove('is-target');
-        if (moved) {
-          if (overTrash(ev)) {
-            trashed.add(el.dataset.id);
-            persistTrash();
-          }
-          persistIcons();
-        }
-      };
-      el.addEventListener('pointermove', move);
-      el.addEventListener('pointerup', up);
-      el.addEventListener('pointercancel', up);
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    moved = false;
+    const startX = e.clientX, startY = e.clientY;
+    const origX = el.offsetLeft, origY = el.offsetTop;
+    const nestable = canNest(el.dataset.id);
+    let target = null;
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('is-dragging');
+
+    const cancelHold = armHold(el, e, () => {
+      moved = true; // swallow the click that follows the release
+      cleanup();
+      showIconMenu(el, e.clientX, e.clientY);
     });
 
-    el.addEventListener('click', e => {
-      if (moved) { e.preventDefault(); return; }
-      activateIcon(el);
-    });
-    el.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateIcon(el); }
-    });
+    const move = ev => {
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 4) moved = true;
+      if (!moved) return;
+      cancelHold();
+      const { w, h } = deskRect();
+      el.style.left = clamp(origX + ev.clientX - startX, 0, w - el.offsetWidth) + 'px';
+      el.style.top = clamp(origY + ev.clientY - startY, 0, h - el.offsetHeight) + 'px';
+      target = markDropTarget(ev, nestable);
+    };
+    const cleanup = () => {
+      cancelHold();
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.classList.remove('is-dragging');
+      markDropTarget(null);
+    };
+    const up = () => {
+      cleanup();
+      if (!moved) return;
+      if (target?.type === 'trash') trashIcon(el.dataset.id);
+      else if (target?.type === 'folder') fileIntoFolder(el.dataset.id, target.id);
+      else persistIcons();
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  });
+
+  el.addEventListener('click', e => {
+    if (moved) { e.preventDefault(); return; }
+    activateIcon(el);
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateIcon(el); }
   });
 }
 
 function overTrash(ev) {
   const r = dockTrash.getBoundingClientRect();
   return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+}
+
+/* True when the pointer is over the bare desktop (icons included) rather
+   than a window, the dock or the menu bar. */
+function overDesktop(ev) {
+  const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+  return Boolean(hit) && desktop.contains(hit) && !hit.closest('.win');
+}
+
+function folderIconAt(ev) {
+  for (const el of iconLayer.querySelectorAll('.desk-icon[data-folder]')) {
+    if (el.hidden) continue;
+    const r = el.getBoundingClientRect();
+    if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) return el;
+  }
+  return null;
+}
+
+/* While something is dragged: the Trash or the folder under the pointer,
+   highlighted. Folders only count when the dragged thing can go in one.
+   Call with no event to clear the highlight. */
+let dropTargetEl = null;
+
+function markDropTarget(ev, nestable = false) {
+  let next = null;
+  if (ev && overTrash(ev)) {
+    next = { type: 'trash', el: dockTrash };
+  } else if (ev && nestable) {
+    const el = folderIconAt(ev);
+    if (el) next = { type: 'folder', id: el.dataset.id, el };
+  }
+  const nextEl = next ? next.el : null;
+  if (dropTargetEl !== nextEl) {
+    dropTargetEl?.classList.remove('is-target');
+    nextEl?.classList.add('is-target');
+    dropTargetEl = nextEl;
+  }
+  return next;
+}
+
+/* Long press for touch: fires unless the pointer moves or lifts first.
+   Returns a cancel function so a drag that gets going can disarm it. */
+function armHold(el, e, fire) {
+  clearTimeout(holdTimer);
+  if (e.pointerType === 'mouse') return () => {};
+  const x = e.clientX, y = e.clientY;
+  const cancel = () => {
+    clearTimeout(holdTimer);
+    el.removeEventListener('pointermove', onMove);
+    el.removeEventListener('pointerup', cancel);
+    el.removeEventListener('pointercancel', cancel);
+  };
+  const onMove = ev => {
+    if (Math.abs(ev.clientX - x) + Math.abs(ev.clientY - y) > 6) cancel();
+  };
+  el.addEventListener('pointermove', onMove);
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  holdTimer = setTimeout(() => { cancel(); fire(); }, LONG_PRESS_MS);
+  return cancel;
 }
 
 /* ── dock ──────────────────────────────────────────────────── */
@@ -1161,7 +1601,9 @@ function boot() {
   // Measure it again now that CSS has given it its real dimensions.
   ambientSnake.refresh();
 
-  applyTrash();
+  folders = loadFolders();
+  folders.forEach(folder => syncFolderIcon(folder));
+  applyVisibility();
   layoutIcons();
   wireIcons();
   syncDock();
@@ -1228,17 +1670,39 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') hideDockHint();
 });
 
-/* ── Desktop context menu ───────────────────────────────────
-   Only on the desktop itself: right-clicking inside a window keeps the
-   browser's own menu so text can still be copied. */
+/* ── Context menus ───────────────────────────────────────────
+   One menu element, rebuilt for whatever was right-clicked: the desktop,
+   an icon on it, or a row inside a folder window. Right-clicking anywhere
+   else in a window keeps the browser's own menu so text can still be
+   copied. On touch, holding still does the same job (see armHold). */
 const ctxMenu = document.getElementById('context-menu');
 
 function hideContext() {
-  if (ctxMenu) ctxMenu.hidden = true;
+  if (!ctxMenu) return;
+  ctxMenu.hidden = true;
+  ctxMenu.innerHTML = '';
 }
 
-function showContext(x, y) {
+/* items: { label, action } entries, or the string 'divider'. */
+function showContext(x, y, items) {
   if (!ctxMenu) return;
+  ctxMenu.innerHTML = '';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    if (item === 'divider') {
+      li.className = 'divider';
+      li.setAttribute('role', 'separator');
+    } else {
+      li.setAttribute('role', 'none');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', 'menuitem');
+      btn.textContent = item.label;
+      btn.addEventListener('click', () => { hideContext(); item.action(); });
+      li.appendChild(btn);
+    }
+    ctxMenu.appendChild(li);
+  });
   ctxMenu.hidden = false;
   const pad = 4;
   ctxMenu.style.left = Math.min(x, window.innerWidth - ctxMenu.offsetWidth - pad) + 'px';
@@ -1246,10 +1710,68 @@ function showContext(x, y) {
   ctxMenu.querySelector('button')?.focus();
 }
 
+/* A keyboard-invoked context menu reports no coordinates; put it on the element. */
+function menuPoint(e, el) {
+  if (e.clientX || e.clientY || !el) return { x: e.clientX, y: e.clientY };
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+function cleanUpDesktop() {
+  store.write('odl-icons', {});
+  layoutIcons();
+}
+
+function showDesktopMenu(x, y) {
+  const d = desktop.getBoundingClientRect();
+  const at = { x: x - d.left, y: y - d.top };
+  showContext(x, y, [
+    { label: 'New Folder', action: () => createFolderAt(at) },
+    'divider',
+    { label: 'Clean Up Desktop', action: cleanUpDesktop },
+  ]);
+}
+
+function showIconMenu(el, x, y) {
+  const id = el.dataset.id;
+  const folder = folders.find(item => item.id === id);
+  const items = [{ label: 'Open', action: () => activateIcon(el) }];
+  if (folder) items.push({ label: 'Rename', action: () => renameFolder(folder) });
+  items.push('divider', { label: 'Move to Trash', action: () => trashIcon(id) });
+  showContext(x, y, items);
+}
+
+function showFolderItemMenu(row, x, y) {
+  const id = row.dataset.id;
+  showContext(x, y, [
+    { label: 'Open', action: () => activateItem(id) },
+    { label: 'Move to Desktop', action: () => placeOnDesktop(id, null) },
+    'divider',
+    { label: 'Move to Trash', action: () => trashIcon(id) },
+  ]);
+}
+
 desktop.addEventListener('contextmenu', e => {
+  const row = e.target.closest('.folder-item');
+  if (row) {
+    e.preventDefault();
+    const { x, y } = menuPoint(e, row);
+    showFolderItemMenu(row, x, y);
+    return;
+  }
   if (e.target.closest('.win')) return;
   e.preventDefault();
-  showContext(e.clientX, e.clientY);
+  const icon = e.target.closest('.desk-icon');
+  const { x, y } = menuPoint(e, icon);
+  if (icon) showIconMenu(icon, x, y);
+  else showDesktopMenu(x, y);
+});
+
+/* Touch: hold still on the empty desktop for its menu. Icons and folder
+   rows arm their own hold in wireIcon and wireFolderItem. */
+desktop.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || e.target.closest('.win, .desk-icon')) return;
+  armHold(desktop, e, () => showDesktopMenu(e.clientX, e.clientY));
 });
 
 dock.addEventListener('contextmenu', e => e.preventDefault());
@@ -1263,12 +1785,6 @@ document.addEventListener('keydown', e => {
 });
 
 window.addEventListener('blur', hideContext);
-
-document.getElementById('ctx-cleanup')?.addEventListener('click', () => {
-  store.write('odl-icons', {});
-  layoutIcons();
-  hideContext();
-});
 
 
 /* ── Apple menu: About, Settings, Lock ─────────────────────── */
@@ -1518,6 +2034,48 @@ async function share() {
 
 document.getElementById('menu-share')?.addEventListener('click', share);
 document.getElementById('menu-quit')?.addEventListener('click', quitActive);
+
+/* ── Reset Desktop ─────────────────────────────────────────────
+   Back to what a first-time visitor sees: icon layout, folders, the
+   Trash, open windows, settings and the boot screen. Games keep their own
+   scores and profiles; those belong to them, not the desktop. */
+const DESKTOP_KEYS = [
+  'odl-icons', 'odl-folders', 'odl-trash', 'odl-window-session',
+  'odl-theme', 'odl-display-scale', 'odl-font-scale',
+  'odl-ambient-snake-speed', 'odl-ambient-snake', 'odl-booted',
+];
+const resetDialog = document.getElementById('reset-dialog');
+
+function showResetDialog() {
+  if (!resetDialog) return;
+  hideContext();
+  resetDialog.hidden = false;
+  document.getElementById('reset-ok')?.focus();
+}
+
+function hideResetDialog() {
+  if (resetDialog) resetDialog.hidden = true;
+}
+
+function resetDesktop() {
+  DESKTOP_KEYS.forEach(key => {
+    try { localStorage.removeItem(key); } catch (e) {}
+  });
+  // Boot again from a clean slate rather than unpicking each piece of
+  // state by hand; the URL goes back to the desktop too.
+  history.replaceState({}, '', '/');
+  location.reload();
+}
+
+document.getElementById('menu-reset')?.addEventListener('click', showResetDialog);
+document.getElementById('reset-cancel')?.addEventListener('click', hideResetDialog);
+document.getElementById('reset-ok')?.addEventListener('click', resetDesktop);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideResetDialog();
+});
+document.addEventListener('pointerdown', e => {
+  if (resetDialog && !resetDialog.hidden && !e.target.closest('#reset-dialog')) hideResetDialog();
+}, true);
 
 /* ── Global keyboard shortcuts ────────────────────────────────
    Bare keys (no ⌘/Ctrl) so we never fight the browser: ⌘Q would quit
