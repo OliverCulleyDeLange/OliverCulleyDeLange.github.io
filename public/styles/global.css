@@ -1410,6 +1410,8 @@ html.desktop-on body {
   padding: 0.35rem 0.2rem;
   cursor: default;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   touch-action: none;
   text-align: center;
 }
@@ -1451,6 +1453,24 @@ html.desktop-on body {
 .desk-icon.is-dragging {
   opacity: 0.65;
   z-index: 5;
+}
+
+/* A folder with something held over it lights up, the way the Trash does. */
+.desk-icon.is-target .desk-label {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.desk-icon.is-target > .mac-icon {
+  filter: invert(1);
+}
+
+/* A row dragged out of a folder window travels as a desktop icon. */
+.desk-icon.is-ghost {
+  position: fixed;
+  z-index: 250;
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 /* ── Windows ── */
@@ -1735,6 +1755,36 @@ html.desktop-on body {
   padding: 0.35rem 0.65rem;
 }
 
+/* Folder windows: rows open on click and drag back out to the desktop. */
+.folder-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.65rem;
+  color: var(--ink);
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+}
+
+.folder-item:hover,
+.folder-item:focus-visible,
+.folder-item.is-dragging {
+  background: var(--ink);
+  color: var(--paper);
+  outline: none;
+}
+
+.folder-item:hover .mac-icon,
+.folder-item:focus-visible .mac-icon,
+.folder-item.is-dragging .mac-icon {
+  color: var(--ink);
+  filter: invert(1);
+}
+
 /* ── Dock ── */
 .dock {
   position: fixed;
@@ -1961,6 +2011,12 @@ html.is-framed .window-body {
   background: var(--ink);
   color: var(--paper);
   outline: none;
+}
+
+.context-menu .divider {
+  border-top: 1px dotted var(--ink);
+  margin: 3px 0;
+  height: 0;
 }
 
 /* ── Menu items that are buttons (Apple menu actions) ── */
@@ -2296,6 +2352,53 @@ html.is-locked body {
   transform: translate(-50%, -50%);
   z-index: 300;
   margin: 0;
+}
+
+/* ── Folder name and reset dialogs ── */
+.folder-dialog[hidden],
+.reset-dialog[hidden] {
+  display: none;
+}
+
+.folder-dialog,
+.reset-dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 300;
+  margin: 0;
+  width: min(380px, calc(100vw - 2rem));
+}
+
+.folder-dialog .dialog-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.folder-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-size: 0.875rem;
+}
+
+.folder-field input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
 }
 
 /* Long-press must not select the label or trigger double-tap zoom. */

@@ -28,10 +28,9 @@ const posts = (await getCollection('posts')).sort(
     <h2 class="section-heading">Applications</h2>
     <ul class="project-cards">
       {projects.map(project => {
-        const { name, tagline, appUrl, appLabel, githubUrl, relatedPosts } = project.data;
-        const primaryHref = relatedPosts.length === 1
-          ? `/posts/${relatedPosts[0]}/`
-          : `/projects/${project.id}/`;
+        const { name, tagline, appUrl, appLabel, githubUrl, standalone } = project.data;
+        // Standalone apps have no Info page: the app is the whole experience.
+        const primaryHref = standalone ? appUrl! : `/projects/${project.id}/`;
         return (
           <li class="project-card">
             <div class="project-card-body">
@@ -49,7 +48,9 @@ const posts = (await getCollection('posts')).sort(
                   </svg>
                 </a>
               )}
-              <a href={primaryHref} class="btn btn-ghost btn-sm">Get Info</a>
+              {!standalone && (
+                <a href={primaryHref} class="btn btn-ghost btn-sm">Get Info</a>
+              )}
               {appUrl && (
                 <a href={appUrl} class="btn btn-primary btn-sm" target="_blank" rel="noopener">{appLabel ?? 'Open'}</a>
               )}

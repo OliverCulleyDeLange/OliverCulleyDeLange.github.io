@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import MacIcon from '../components/MacIcon.astro';
 import { iconFor } from '../lib/project-icons';
+import { desktopFolders } from '../lib/desktop-folders';
 
 interface Props {
   title?: string;
@@ -35,17 +36,14 @@ const postById = new Map(allPosts.map(post => [post.id, post]));
 const byDateDesc = (a: (typeof allPosts)[number], b: (typeof allPosts)[number]) =>
   b.data.date.valueOf() - a.data.date.valueOf();
 
-/* Projects menu launches the deployed app when there is one. */
-const projectHref = (project: (typeof projects)[number]) => {
-  const { appUrl, relatedPosts = [] } = project.data;
-  if (appUrl) return appUrl;
-  return relatedPosts.length === 1
-    ? `/posts/${relatedPosts[0]}/`
-    : `/projects/${project.id}/`;
-};
+/* Projects menu launches the deployed app when there is one, otherwise the
+   project page. A related post is a dev log, never the project's own page. */
+const projectHref = (project: (typeof projects)[number]) =>
+  project.data.appUrl ?? `/projects/${project.id}/`;
 const isExternal = (href: string) => /^https?:\/\//.test(href);
 
-/* Blog menu is tiered: a submenu per project that has more than one post. */
+/* Blog menu is tiered: a submenu per project that has more than one post.
+   A project with a single post is listed under that post's own title. */
 const claimed = new Set<string>();
 const blogGroups = projects
   .map(project => {
@@ -65,25 +63,34 @@ const looseposts = allPosts.filter(post => !claimed.has(post.id)).sort(byDateDes
    Icons are server-rendered so they are real links for crawlers and for
    anyone without JS; desktop.js takes them over and makes them draggable.
    A project can pin its icon to a screen corner (games live bottom-right,
-   above Settings) instead of joining the normal top-left icon flow. */
-const deskIconHref = (project: (typeof projects)[number]) =>
-  project.data.standalone ? project.data.appUrl! : `/projects/${project.id}/`;
-
+   above Settings) instead of joining the normal top-left icon flow.
+   Folders (see lib/desktop-folders) join that flow too, slotted in by
+   order; the icons they hold are still rendered, and desktop.js hides
+   them until they are dragged back out. */
 const flowProjects = projects.filter(project => !project.data.pinned);
 const pinnedProjects = projects.filter(project => project.data.pinned);
 
-const deskIcons = flowProjects.map(project => ({
-  id: project.id,
-  name: project.data.name,
-  icon: iconFor(project.id),
-  href: deskIconHref(project),
-}));
+const deskIcons = [
+  ...flowProjects.map(project => ({
+    id: project.id,
+    name: project.data.name,
+    icon: iconFor(project.id),
+    order: project.data.order ?? 99,
+    folder: false,
+  })),
+  ...desktopFolders.map(folder => ({
+    id: folder.id,
+    name: folder.name,
+    icon: folder.icon,
+    order: folder.order,
+    folder: true,
+  })),
+].sort((a, b) => a.order - b.order);
 
 const pinnedIcons = pinnedProjects.map(project => ({
   id: project.id,
   name: project.data.name,
   icon: iconFor(project.id),
-  href: deskIconHref(project),
   corner: project.data.pinned,
 }));
 
@@ -96,6 +103,12 @@ const desktopData = {
     appUrl: project.data.appUrl ?? null,
     icon: iconFor(project.id),
     standalone: project.data.standalone,
+  })),
+  folders: desktopFolders.map(folder => ({
+    id: folder.id,
+    name: folder.name,
+    icon: folder.icon,
+    items: folder.items,
   })),
   posts: allPosts.sort(byDateDesc).map(post => ({
     id: post.id,
@@ -113,6 +126,17 @@ const socialIcons = [
   { id: 'github', name: 'GitHub', icon: 'github', href: 'https://github.com/OliverCulleyDeLange' },
   { id: 'linkedin', name: 'LinkedIn', icon: 'linkedin', href: 'https://www.linkedin.com/in/oliverculleydelange' },
 ];
+
+/* A folder's starting contents must name real desktop icons, so a typo
+   fails the build here rather than shipping an empty folder. */
+const fileableIds = new Set([...projects.map(p => p.id), ...socialIcons.map(i => i.id), 'settings']);
+desktopFolders.forEach(folder => {
+  folder.items.forEach(item => {
+    if (!fileableIds.has(item)) {
+      throw new Error(`Desktop folder "${folder.name}" lists an unknown icon "${item}"`);
+    }
+  });
+});
 
 /* Every glyph the script may need to clone at runtime. */
 const iconNames = [...new Set([
@@ -195,11 +219,11 @@ const iconNames = [...new Set([
             <MacIcon name="monogram" size={15} class="monogram" />
           </span>
           <ul class="menu-dropdown">
-            <li><button type="button" id="menu-about">About This Site…</button></li>
+            <li><button type="button" id="menu-about">About This Site</button></li>
             <li class="divider" role="separator"></li>
             <li>
               <button type="button" id="menu-settings">
-                <span>Settings…</span><span class="menu-shortcut" aria-hidden="true">,</span>
+                <span>Settings</span><span class="menu-shortcut" aria-hidden="true">,</span>
               </button>
             </li>
             <li><button type="button" id="menu-lock">Lock Screen</button></li>
@@ -216,6 +240,8 @@ const iconNames = [...new Set([
                 <span>Share</span><span class="menu-shortcut" aria-hidden="true">S</span>
               </button>
             </li>
+            <li class="divider" role="separator"></li>
+            <li><button type="button" id="menu-reset">Reset Desktop</button></li>
             <li class="divider" role="separator"></li>
             <li>
               <button type="button" id="menu-quit">
@@ -256,7 +282,7 @@ const iconNames = [...new Set([
                   </ul>
                 </li>
               ) : (
-                <li><a href={`/posts/${posts[0].id}/`}>{project.data.name}</a></li>
+                <li><a href={`/posts/${posts[0].id}/`}>{posts[0].data.title}</a></li>
               )
             ))}
             {looseposts.length > 0 && <li class="divider" role="separator"></li>}
@@ -286,7 +312,8 @@ const iconNames = [...new Set([
       <canvas class="ambient-snake" id="ambient-snake" aria-label="Ambient Snake game. It plays itself until you use the arrow keys."></canvas>
       <ul class="desk-icons" id="desk-icons">
         {deskIcons.map(item => (
-          <li class="desk-icon" data-id={item.id} tabindex="0" role="button" aria-label={`Open ${item.name}`}>
+          <li class="desk-icon" data-id={item.id} data-folder={item.folder ? 'true' : undefined}
+              tabindex="0" role="button" aria-label={`Open ${item.name}`}>
             <MacIcon name={item.icon as any} size={32} />
             <span class="desk-label">{item.name}</span>
           </li>
@@ -380,11 +407,46 @@ const iconNames = [...new Set([
       </div>
     </div>}
 
-    {isDesktopShell && <ul class="context-menu" id="context-menu" hidden role="menu">
-      <li role="none">
-        <button type="button" id="ctx-cleanup" role="menuitem">Clean Up Desktop</button>
-      </li>
-    </ul>}
+    {/* Filled in by desktop.js: the items depend on what was right-clicked. */}
+    {isDesktopShell && <ul class="context-menu" id="context-menu" hidden role="menu"></ul>}
+
+    {isDesktopShell && <div class="dialog reset-dialog" id="reset-dialog" hidden role="alertdialog"
+         aria-modal="true" aria-labelledby="reset-dialog-title">
+      <div class="dialog-inner">
+        <div class="dialog-body">
+          <MacIcon name="monogram" size={36} />
+          <div class="dialog-text">
+            <p id="reset-dialog-title">Reset the desktop?</p>
+            <p>Icons, folders, the Trash, open windows and settings go back to how they started.</p>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-sm" id="reset-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" id="reset-ok">Reset</button>
+        </div>
+      </div>
+    </div>}
+
+    {isDesktopShell && <div class="dialog folder-dialog" id="folder-dialog" hidden role="dialog"
+         aria-modal="true" aria-labelledby="folder-dialog-title">
+      <form class="dialog-inner" id="folder-form">
+        <div class="dialog-body">
+          <MacIcon name="folder" size={36} />
+          <div class="dialog-text">
+            <p id="folder-dialog-title">New Folder</p>
+            <label class="folder-field">
+              <span>Name:</span>
+              <input type="text" id="folder-name" name="folder-name" maxlength="40"
+                     autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-sm" id="folder-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="folder-ok">Create</button>
+        </div>
+      </form>
+    </div>}
 
     {isDesktopShell && <div id="icon-templates" hidden>
       {iconNames.map(name => (

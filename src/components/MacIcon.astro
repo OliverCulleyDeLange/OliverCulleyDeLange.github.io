@@ -3,7 +3,7 @@
    Fills use --paper / currentColor so everything inverts in dark mode. */
 interface Props {
   name:
-    | 'doc' | 'app' | 'folder' | 'settings' | 'monogram' | 'happymac' | 'bomb'
+    | 'doc' | 'app' | 'folder' | 'home' | 'settings' | 'monogram' | 'happymac' | 'bomb'
     /* Social icons — pinned top-right on the desktop. */
     | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
@@ -58,6 +58,18 @@ const letterO: [number, number, number][] = [
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
     <path d="M1 3h5l1 2h8v9H1z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
     <path d="M1 6h14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+)}
+{name === 'home' && (
+  /* House — a folder for home-buying tools. Roof over walls, a chimney
+     through the right slope, a door and two windows. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M3 7h10v8H3z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <path d="M1 8 8 1l7 7z" fill="var(--paper)" stroke="currentColor" stroke-width="1" stroke-linejoin="miter"/>
+    <rect x="11" y="2" width="2" height="3" fill="currentColor"/>
+    <rect x="7" y="10" width="2" height="5" fill="currentColor"/>
+    <rect x="4" y="9" width="2" height="2" fill="currentColor"/>
+    <rect x="10" y="9" width="2" height="2" fill="currentColor"/>
   </svg>
 )}
 {name === 'settings' && (
