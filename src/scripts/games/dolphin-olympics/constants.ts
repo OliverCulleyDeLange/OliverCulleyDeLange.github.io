@@ -13,6 +13,7 @@ export const CY = 240;
 export const FPS = 31;
 export const GRAVITY = 0.45;
 export const WATER_FRICTION = 0.2;
+export const PIXELS_PER_METRE = 50;
 
 /* Real-time timers in the original (ms) become frame counts here so the
    simulation stays deterministic regardless of the display refresh rate. */

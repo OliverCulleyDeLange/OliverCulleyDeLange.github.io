@@ -13,10 +13,6 @@ const KEY_MAP: Record<string, GameKey> = {
   ArrowRight: 'right',
   ArrowUp: 'up',
   ArrowDown: 'down',
-  KeyA: 'left',
-  KeyD: 'right',
-  KeyW: 'up',
-  KeyS: 'down',
 };
 
 export function gameKeyFor(event: KeyboardEvent): GameKey | null {
