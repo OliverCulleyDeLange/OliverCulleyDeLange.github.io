@@ -126,7 +126,7 @@ export function mountProfileUI(root: HTMLElement, initial: Profile, onChange: (p
       } else if (state === 'connecting') {
         status.textContent = '○ connecting…';
       } else {
-        status.textContent = '○ offline';
+        status.textContent = '○ offline · Play Online to swim with others';
       }
     },
     destroy() {

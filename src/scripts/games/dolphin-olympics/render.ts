@@ -414,7 +414,10 @@ function drawRemoteDolphin(ctx: CanvasRenderingContext2D, level: Level, pose: Re
       pose.angle,
       { anim: pose.anim, frame: pose.frame, roll: pose.roll, glowAlpha: pose.glow, glowBlur: 2 + pose.glow * 6 },
       isAfk ? '#8793a1' : null,
-      isAfk ? 0.62 : 0.92,
+      /* Opaque while active: the dolphin is many overlapping fills and
+         strokes, each drawn at the context alpha, so anything less lets
+         the layers show through one another and the edges read as a blur. */
+      isAfk ? 0.62 : 1,
       skin
     );
     ctx.font = `bold 11px ${FONT}`;
@@ -441,8 +444,9 @@ function drawRemoteDolphin(ctx: CanvasRenderingContext2D, level: Level, pose: Re
   const suffix = ` · ${distance}m`;
   if (mx > W / 2) drawNameTag(ctx, mx - 9, my + 4, profile, 'right', '#e8f1ff', suffix);
   else drawNameTag(ctx, mx + 9, my + 4, profile, 'left', '#e8f1ff', suffix);
-  if (isAfk) drawChatBubble(ctx, mx, my - 8, afkText, 0.9);
-  else drawChatBubble(ctx, mx, my - 8, player.chatText, chatAlpha(player.chatText, player.chatUpdatedAt, now));
+  /* Only chat follows a player off the stage: the grey marker already
+     says they are away. */
+  drawChatBubble(ctx, mx, my - 8, player.chatText, chatAlpha(player.chatText, player.chatUpdatedAt, now));
   ctx.restore();
 }
 
@@ -1330,6 +1334,7 @@ const HELP_LINES = [
   ['Left / Right', 'Turn. Underwater this steers you; in the air it spins you for Front and Back Flips.'],
   ['Down', 'Roll. In the air a full roll is a Corkscrew. Hold it as you surface to tailslide along the water.'],
   ['Up while sliding', 'Pop off the slide and launch skyward.'],
+  ['Type', 'Chat to the room when playing online. Enter clears it.'],
   ['Escape', 'Pause.'],
 ];
 
@@ -1389,7 +1394,7 @@ function drawTitle(ctx: CanvasRenderingContext2D, state: RenderState): void {
   }
   ctx.textAlign = 'center';
   ctx.font = `bold 12px ${FONT}`;
-  outlinedText(ctx, 'Arrow keys to swim. Type to chat. Two minutes on the clock. Enter to start.', CX, 458, '#e8f1ff');
+  outlinedText(ctx, 'Arrow keys to swim. Two minutes on the clock. Enter to start.', CX, 458, '#e8f1ff');
   if (level.skyMode !== 'day') {
     ctx.font = `11px ${FONT}`;
     outlinedText(ctx, level.skyMode === 'night' ? 'Night swim.' : 'Evening swim.', CX, 440, '#bfe3ff');
@@ -1480,8 +1485,9 @@ export function layoutButtons(screen: Screen, help: boolean, game: DolphinGame |
   if (screen === 'title') {
     return [
       { id: 'start', label: 'Start Game', x: 330, y: 150, w: 190, h: 36 },
-      { id: 'help', label: 'How to Play', x: 330, y: 200, w: 190, h: 36 },
+      { id: 'online', label: 'Play Online', x: 330, y: 200, w: 190, h: 36 },
       { id: 'freeswim', label: 'Free Swim', x: 330, y: 250, w: 190, h: 36 },
+      { id: 'help', label: 'How to Play', x: 330, y: 300, w: 190, h: 36 },
     ];
   }
   const inGame: UIButton[] = [{ id: 'ingame-menu', label: 'Menu', x: 566, y: 448, w: 64, h: 22 }];

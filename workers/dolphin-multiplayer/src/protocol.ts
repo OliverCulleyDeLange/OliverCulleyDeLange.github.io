@@ -47,6 +47,10 @@ export interface PlayerState {
   /* 1 while actually playing; 0 on the menus, where the dolphin is not
      in the world and should not be drawn. */
   p: 0 | 1;
+  /* The sender's clock (its performance.now(), ms) at the moment this
+     pose was true. Receivers place poses on that timeline rather than on
+     arrival time, which the network jitters. 0 when unknown. */
+  ts: number;
 }
 
 export interface RemotePlayerInfo {
@@ -139,5 +143,6 @@ export function sanitizeState(raw: unknown): PlayerState | null {
     g: Math.round(num(s.g, 0, 1) * 100) / 100,
     s: Math.round(num(s.s, 0, 1_000_000_000)),
     p: s.p === 1 || s.p === true ? 1 : 0,
+    ts: Math.round(num(s.ts, 0, 1e14)),
   };
 }

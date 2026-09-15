@@ -23,10 +23,12 @@ import { skinById } from './skins';
    canvas; menus, help, the HUD and the end-of-game summary are all drawn
    here so the whole thing stays a 640x480 stage, like the original.
 
-   Multiplayer is a layer on top: everyone in a room streams their
-   dolphin's pose to a Cloudflare Worker (see workers/dolphin-multiplayer)
-   which relays it to the others, who draw it as a ghost in their own
-   world. Rings, fish and scoring stay local to each player. */
+   Multiplayer is a layer on top, and opt-in: "Play Online" on the title
+   screen connects to a room on a Cloudflare Worker (see
+   workers/dolphin-multiplayer), streams your dolphin's pose there and draws
+   everyone else's as ghosts in your own world. The other modes never open
+   the socket, so they cost nothing against the worker's free-plan limits.
+   Rings, fish and scoring stay local to each player either way. */
 
 const BEST_KEY = 'odl-dolphin-olympics-best';
 const STEP_MS = 1000 / 31;
@@ -99,6 +101,9 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
 
   /* --- multiplayer ------------------------------------------------- */
 
+  /* True from "Play Online" until the player returns to the title. Only
+     then is the socket open, chat enabled and the roster drawn. */
+  let online = false;
   let profile: Profile = loadProfile();
   let skin = skinById(profile.skin);
   let profileUI: ProfileUI | null = null;
@@ -121,7 +126,6 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
     });
     profileUI.setStatus(client.status, client.onlineCount, client.room);
   }
-  client.connect();
 
   function updateChat(text: string): void {
     chatText = sanitizeChat(text);
@@ -157,10 +161,13 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
   }
 
   /* Our dolphin's pose in world space: it sits at a fixed stage position
-     while the level scrolls, so undo the scroll. */
-  function localState(playing: boolean): PlayerState {
+     while the level scrolls, so undo the scroll. `at` is the wall-clock
+     moment this pose is true for: the simulation step that produced it,
+     not whenever the send happens to run. */
+  function localState(playing: boolean, at: number): PlayerState {
+    const ts = Math.round(at);
     const p = game?.player;
-    if (!p || !game) return { x: 0, y: 0, a: 0, an: 0, f: 0, r: 0, g: 0, s: 0, p: 0 };
+    if (!p || !game) return { x: 0, y: 0, a: 0, an: 0, f: 0, r: 0, g: 0, s: 0, p: 0, ts };
     return {
       x: Math.round(p.x - level.pm.x),
       y: Math.round(p.y - level.bgY),
@@ -171,6 +178,7 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       g: Math.round(p.glowAlpha * 100) / 100,
       s: game.score,
       p: playing ? 1 : 0,
+      ts,
     };
   }
 
@@ -187,8 +195,11 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
   }
 
-  function startGame(mode: GameMode): void {
+  function startGame(mode: GameMode, playOnline = false): void {
     clearChat();
+    online = playOnline;
+    if (online) client.connect();
+    else client.disconnect();
     if (game) game.exit();
     game = new DolphinGame(level, mode);
     game.onGameEnd = (result) => {
@@ -208,8 +219,9 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
 
   function goToTitle(): void {
     clearChat();
-    /* Tell the room we have left the water before the game goes away. */
-    client.sendState(localState(false));
+    /* Leaving the game leaves the room too; the server tells the others. */
+    client.disconnect();
+    online = false;
     if (game) game.exit();
     game = null;
     level.reset();
@@ -230,6 +242,9 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
     switch (id) {
       case 'start':
         startGame('freestyle');
+        break;
+      case 'online':
+        startGame('freestyle', true);
         break;
       case 'freeswim':
         startGame('freeswim');
@@ -314,10 +329,13 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       else if (help) {
         help = false;
         relayout();
+      } else if (screen === 'game' && game && !game.paused && chatDraft) {
+        clearChat();
       }
       return;
     }
-    if (screen === 'game' && game && !help && !game.paused) {
+    /* Typing is chat, which only exists in an online game. */
+    if (online && screen === 'game' && game && !help && !game.paused) {
       if (event.key === 'Backspace') {
         event.preventDefault();
         deleteChatCharacter();
@@ -356,7 +374,11 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       frame++;
       if (game) {
         game.frame();
-        if (frame % SEND_EVERY === 0) client.sendState(localState(true));
+        /* The accumulator is how far wall time has run ahead of the
+           simulation, so this stamp is when the step just taken landed.
+           Stamping with the send time instead would wobble by up to a
+           step between packets and other players would see it as judder. */
+        if (frame % SEND_EVERY === 0) client.sendState(localState(true, time - accumulator));
       }
     }
     if (accumulator > STEP_MS * 4) accumulator = 0;
@@ -371,12 +393,14 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       frame,
       buttons,
       skin,
-      multiplayer: {
-        status: client.status,
-        room: client.room,
-        self: { profile, score: game?.score ?? 0, chatText, chatUpdatedAt },
-        others: client.others,
-      },
+      multiplayer: online
+        ? {
+            status: client.status,
+            room: client.room,
+            self: { profile, score: game?.score ?? 0, chatText, chatUpdatedAt },
+            others: client.others,
+          }
+        : null,
     };
     render(ctx, state);
     animationFrame = requestAnimationFrame(tick);
