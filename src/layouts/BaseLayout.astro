@@ -2,7 +2,7 @@
 import { getCollection } from 'astro:content';
 import MacIcon from '../components/MacIcon.astro';
 import { iconFor } from '../lib/project-icons';
-import { desktopFolders } from '../lib/desktop-folders';
+import { desktopFolders, folderIcon } from '../lib/desktop-folders';
 
 interface Props {
   title?: string;
@@ -62,30 +62,30 @@ const looseposts = allPosts.filter(post => !claimed.has(post.id)).sort(byDateDes
 /* ── Desktop ──
    Icons are server-rendered so they are real links for crawlers and for
    anyone without JS; desktop.js takes them over and makes them draggable.
-   A project can pin its icon to a screen corner (games live bottom-right,
-   above Settings) instead of joining the normal top-left icon flow.
-   Folders (see lib/desktop-folders) join that flow too, slotted in by
-   order; the icons they hold are still rendered, and desktop.js hides
-   them until they are dragged back out. */
+   Folders lead the flow — Blog first, then lib/desktop-folders by its own
+   order — and the apps follow by project order. The icons a folder holds
+   are still rendered, and desktop.js hides them until they are dragged
+   back out. A project can pin its icon to a screen corner instead of
+   joining the flow at all. */
 const flowProjects = projects.filter(project => !project.data.pinned);
 const pinnedProjects = projects.filter(project => project.data.pinned);
 
 const deskIcons = [
+  ...[...desktopFolders]
+    .sort((a, b) => a.order - b.order)
+    .map(folder => ({
+      id: folder.id,
+      name: folder.name,
+      icon: folderIcon(folder),
+      folder: true,
+    })),
   ...flowProjects.map(project => ({
     id: project.id,
     name: project.data.name,
     icon: iconFor(project.id),
-    order: project.data.order ?? 99,
     folder: false,
   })),
-  ...desktopFolders.map(folder => ({
-    id: folder.id,
-    name: folder.name,
-    icon: folder.icon,
-    order: folder.order,
-    folder: true,
-  })),
-].sort((a, b) => a.order - b.order);
+];
 
 const pinnedIcons = pinnedProjects.map(project => ({
   id: project.id,
@@ -107,7 +107,7 @@ const desktopData = {
   folders: desktopFolders.map(folder => ({
     id: folder.id,
     name: folder.name,
-    icon: folder.icon,
+    icon: folderIcon(folder),
     items: folder.items,
   })),
   posts: allPosts.sort(byDateDesc).map(post => ({
@@ -129,7 +129,7 @@ const socialIcons = [
 
 /* A folder's starting contents must name real desktop icons, so a typo
    fails the build here rather than shipping an empty folder. */
-const fileableIds = new Set([...projects.map(p => p.id), ...socialIcons.map(i => i.id), 'settings']);
+const fileableIds = new Set([...projects.map(p => p.id), ...socialIcons.map(i => i.id)]);
 desktopFolders.forEach(folder => {
   folder.items.forEach(item => {
     if (!fileableIds.has(item)) {
@@ -311,6 +311,10 @@ const iconNames = [...new Set([
     {isDesktopShell && <div class="desktop" id="desktop" hidden>
       <canvas class="ambient-snake" id="ambient-snake" aria-label="Ambient Snake game. It plays itself until you use the arrow keys."></canvas>
       <ul class="desk-icons" id="desk-icons">
+        <li class="desk-icon" data-id="blog" tabindex="0" role="button" aria-label="Open Blog">
+          <MacIcon name="folder" size={32} />
+          <span class="desk-label">Blog</span>
+        </li>
         {deskIcons.map(item => (
           <li class="desk-icon" data-id={item.id} data-folder={item.folder ? 'true' : undefined}
               tabindex="0" role="button" aria-label={`Open ${item.name}`}>
@@ -318,14 +322,6 @@ const iconNames = [...new Set([
             <span class="desk-label">{item.name}</span>
           </li>
         ))}
-        <li class="desk-icon" data-id="blog" tabindex="0" role="button" aria-label="Open Blog">
-          <MacIcon name="folder" size={32} />
-          <span class="desk-label">Blog</span>
-        </li>
-        <li class="desk-icon" data-id="settings" data-corner="br" tabindex="0" role="button" aria-label="Open Settings">
-          <MacIcon name="settings" size={32} />
-          <span class="desk-label">Settings</span>
-        </li>
         {pinnedIcons.filter(item => item.corner === 'br').map(item => (
           <li class="desk-icon" data-id={item.id} data-corner="br" tabindex="0" role="button" aria-label={`Open ${item.name}`}>
             <MacIcon name={item.icon as any} size={32} />
@@ -357,6 +353,10 @@ const iconNames = [...new Set([
       <div class="dock-sep"></div>
       <div class="dock-items" id="dock-items"></div>
       <div class="dock-sep dock-sep-min"></div>
+      <button class="dock-item dock-settings" id="dock-settings" type="button" aria-label="Settings">
+        <MacIcon name="settings" size={28} />
+        <span class="dock-label">Settings</span>
+      </button>
       <button class="dock-item dock-trash" id="dock-trash" type="button" aria-label="Trash">
         <svg class="mac-icon" width="28" height="28" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
           <path d="M4 5h8v9H4z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>

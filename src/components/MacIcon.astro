@@ -3,19 +3,26 @@
    Fills use --paper / currentColor so everything inverts in dark mode. */
 interface Props {
   name:
-    | 'doc' | 'app' | 'folder' | 'home' | 'settings' | 'monogram' | 'happymac' | 'bomb'
+    | 'doc' | 'app' | 'folder' | 'home' | 'games' | 'settings' | 'monogram' | 'happymac' | 'bomb'
     /* Social icons — pinned top-right on the desktop. */
     | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'survey' | 'memory'
     | 'scribbles' | 'location-alarm' | 'climb' | 'map'
-    | 'pinball' | 'dolphin-olympics';
+    | 'pinball' | 'dolphin-olympics'
+    /* A folder carrying a glyph on its face, e.g. 'folder:home'. */
+    | `folder:${string}`;
   size?: number;
   class?: string;
+  /* Drawn inside another icon: skip the .mac-icon class so a host's hover
+     filter (invert) can't apply twice, once outside and once in. */
+  nested?: boolean;
 }
-const { name, size, class: className = '' } = Astro.props;
+const { name, size, class: className = '', nested = false } = Astro.props;
 const px = size ?? 16;
-const cls = `mac-icon ${className}`.trim();
+const cls = [nested ? null : 'mac-icon', className].filter(Boolean).join(' ') || undefined;
+/* A plain folder is the default; give one an icon and it rides on the face. */
+const folderGlyph = name.startsWith('folder:') ? name.slice('folder:'.length) : null;
 
 /* Filled pixel disc, 16x16 */
 const disc: [number, number, number][] = [
@@ -58,6 +65,30 @@ const letterO: [number, number, number][] = [
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
     <path d="M1 3h5l1 2h8v9H1z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
     <path d="M1 6h14" stroke="currentColor" stroke-width="1"/>
+  </svg>
+)}
+{folderGlyph && (
+  /* The same folder, with its glyph at half scale on the face — so a folder
+     that has an icon still reads as a folder first. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M1 3h5l1 2h8v9H1z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <path d="M1 6h14" stroke="currentColor" stroke-width="1"/>
+    <g transform="translate(4 6) scale(0.5)">
+      <Astro.self name={folderGlyph as any} size={16} nested />
+    </g>
+  </svg>
+)}
+{name === 'games' && (
+  /* Gamepad — slab body, D-pad left, two buttons right. Drawn chunky so it
+     survives being shrunk onto a folder face. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M1 4h14v8H1z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <g fill="currentColor">
+      <rect x="4" y="5" width="2" height="6"/>
+      <rect x="2" y="7" width="6" height="2"/>
+      <rect x="10" y="6" width="2" height="2"/>
+      <rect x="12" y="9" width="2" height="2"/>
+    </g>
   </svg>
 )}
 {name === 'home' && (
@@ -191,24 +222,26 @@ const letterO: [number, number, number][] = [
   </svg>
 )}
 {name === 'memory' && (
-  /* Number card — three digits shown to memorise. */
+  /* Memory — three digits to hold in your head, drawn big enough to read
+     once the icon is shrunk onto a folder face. */
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
-    <rect x="1" y="2" width="14" height="12" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
     <g fill="currentColor">
       {/* "1" */}
-      <rect x="3" y="6" width="1" height="4"/>
-      <rect x="2" y="7" width="1" height="1"/>
+      <rect x="1" y="5" width="1" height="1"/>
+      <rect x="2" y="4" width="2" height="9"/>
+      <rect x="1" y="12" width="4" height="1"/>
       {/* "2" */}
-      <rect x="6" y="6" width="3" height="1"/>
-      <rect x="8" y="7" width="1" height="1"/>
-      <rect x="6" y="8" width="3" height="1"/>
-      <rect x="6" y="9" width="1" height="1"/>
-      <rect x="6" y="10" width="3" height="1"/>
+      <rect x="6" y="4" width="4" height="1"/>
+      <rect x="9" y="5" width="1" height="3"/>
+      <rect x="6" y="8" width="4" height="1"/>
+      <rect x="6" y="9" width="1" height="3"/>
+      <rect x="6" y="12" width="4" height="1"/>
       {/* "3" */}
-      <rect x="11" y="6" width="3" height="1"/>
-      <rect x="13" y="7" width="1" height="3"/>
-      <rect x="11" y="8" width="2" height="1"/>
-      <rect x="11" y="10" width="3" height="1"/>
+      <rect x="11" y="4" width="4" height="1"/>
+      <rect x="14" y="5" width="1" height="3"/>
+      <rect x="12" y="8" width="3" height="1"/>
+      <rect x="14" y="9" width="1" height="3"/>
+      <rect x="11" y="12" width="4" height="1"/>
     </g>
   </svg>
 )}
@@ -302,28 +335,27 @@ const letterO: [number, number, number][] = [
   </svg>
 )}
 {name === 'pinball' && (
-  /* Pinball — a ball above two angled flippers, framed like a tiny table. */
+  /* Pinball — a ball, two bumpers and a pair of flippers. */
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
-    <rect x="0.5" y="0.5" width="15" height="15" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
-    <circle cx="8" cy="4" r="1.5" fill="currentColor"/>
-    <circle cx="4.5" cy="9" r="1" fill="currentColor"/>
-    <circle cx="11.5" cy="9" r="1" fill="currentColor"/>
-    <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-      <path d="M3 13.5 6.75 11.25"/>
-      <path d="M13 13.5 9.25 11.25"/>
+    <circle cx="8" cy="3" r="2" fill="currentColor"/>
+    <circle cx="3" cy="8" r="1.5" fill="currentColor"/>
+    <circle cx="13" cy="8" r="1.5" fill="currentColor"/>
+    {/* Hinged at the outside, tips angled down to the drain gap: a V, not a ^ */}
+    <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M2 11.5 6.75 14.5"/>
+      <path d="M14 11.5 9.25 14.5"/>
     </g>
   </svg>
 )}
 {name === 'dolphin-olympics' && (
   /* Dolphin Olympics — a dolphin mid-leap over a wavy waterline. */
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-    <rect x="0.5" y="0.5" width="15" height="15" fill="var(--paper)" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
-    <path d="M1 12.5q1.5-1.5 3 0t3 0t3 0t3 0" fill="none" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
+    <path d="M0 12.5q1.5-1.5 3 0t3 0t3 0t3 0t3 0" fill="none" stroke="currentColor" stroke-width="1" shape-rendering="crispEdges"/>
     <g fill="currentColor">
-      <ellipse cx="8" cy="6.5" rx="3.6" ry="2" transform="rotate(-25 8 6.5)"/>
-      <path d="M10.8 5.2 13 4 11.6 6.4Z"/>
-      <path d="M5.6 7.6 3.6 9.4 5.2 6.6Z"/>
-      <path d="M7.6 4.6 8.6 2 9.4 4.8Z"/>
+      <ellipse cx="8" cy="6.5" rx="4.15" ry="2.3" transform="rotate(-25 8 6.5)"/>
+      <path d="M11.2 5 13.75 3.6 12.1 6.4Z"/>
+      <path d="M5.25 7.75 2.95 9.85 4.8 6.6Z"/>
+      <path d="M7.55 4.3 8.7 1.35 9.6 4.55Z"/>
     </g>
   </svg>
 )}

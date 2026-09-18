@@ -47,6 +47,7 @@ const iconLayer = document.getElementById('desk-icons');
 const dock = document.getElementById('dock');
 const dockItems = document.getElementById('dock-items');
 const dockTrash = document.getElementById('dock-trash');
+const dockSettings = document.getElementById('dock-settings');
 const dockBrowser = document.getElementById('dock-browser');
 const dockBrowserLabel = document.getElementById('dock-browser-label');
 const ambientSnake = createAmbientSnake(document.getElementById('ambient-snake'));
@@ -56,6 +57,9 @@ const wins = new Map();
 let zTop = 20;
 let activeWin = null;
 let trashed = new Set(store.read('odl-trash', []));
+/* Settings used to be a desktop icon and now lives in the dock, so an old
+   visitor may still have it in the Trash with nothing to put back. */
+trashed.delete('settings');
 /* Filled by loadFolders() at boot, once the desktop icons exist to check
    against; see the Folders section. */
 let folders = [];
@@ -1191,7 +1195,6 @@ function iconMeta(id) {
   const folder = folders.find(item => item.id === id);
   if (folder) return { id, name: folder.name, icon: folder.icon, kind: 'Folder' };
   if (id === 'blog') return { id, name: 'Blog', icon: 'folder', kind: 'Folder' };
-  if (id === 'settings') return { id, name: 'Settings', icon: 'settings', kind: 'System' };
   if (id === 'cv') return { id, name: 'CV', icon: 'doc', kind: 'Document' };
   if (id === 'github') return { id, name: 'GitHub', icon: 'github', kind: 'Link' };
   if (id === 'linkedin') return { id, name: 'LinkedIn', icon: 'linkedin', kind: 'Link' };
@@ -1294,7 +1297,6 @@ function activateIcon(el) {
     return;
   }
   if (id === 'blog') return openBlogFolder();
-  if (id === 'settings') return openSettings();
   const folder = folders.find(item => item.id === id);
   if (folder) return openFolder(folder);
   const project = data.projects.find(p => p.id === id);
@@ -1645,6 +1647,7 @@ function boot() {
 
 /* dock trash: click opens it, and it is the drop target handled above */
 dockTrash.addEventListener('click', openTrash);
+dockSettings?.addEventListener('click', () => openSettings());
 
 /* ── "You can double tap to close" hint ────────────────────── */
 const dockHint = document.getElementById('dock-hint');
@@ -1906,7 +1909,7 @@ function openSettings(opts = {}) {
 
   openWindow({
     id: 'settings', title: 'Settings', kind: 'folder',
-    icon: 'monogram', node, size: { w: 400, h: 440 }, rect: opts.rect,
+    icon: 'settings', node, size: { w: 400, h: 440 }, rect: opts.rect,
     forceFitContent: true,
   });
 }
