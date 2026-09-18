@@ -38,8 +38,10 @@ The version is a hash of the shell, so a deploy that changes nothing leaves
 the visitor's cache alone, and one that does swaps the whole cache over.
 There is no `sw.js` in `astro dev` — only the built site registers a worker.
 
-Install metadata lives in `public/manifest.webmanifest`; the icons are
-generated from `public/favicon.svg` by `python3 scripts/make-icons.py`.
+Install metadata lives in `public/manifest.webmanifest`. The home-screen
+icons are rendered into the build by `src/integrations/app-icons.mjs`,
+which blows the 16x16 favicon art up to the sizes a PWA needs — so there
+are no icon files to keep in step with the mark.
 
 ## Dolphin Olympics multiplayer
 
