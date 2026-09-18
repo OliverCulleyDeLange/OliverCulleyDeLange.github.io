@@ -323,6 +323,9 @@ function openWindow(opts) {
     frame.src = opts.src;
     frame.title = opts.title;
     frame.loading = 'lazy';
+    /* Games in a window can still go fullscreen, which is the only way
+       one is playable on a phone. */
+    frame.allow = 'fullscreen';
     body.appendChild(frame);
     body.classList.add('is-frame');
   } else if (opts.node) {

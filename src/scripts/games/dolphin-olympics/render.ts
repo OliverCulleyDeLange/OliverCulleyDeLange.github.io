@@ -9,6 +9,7 @@ import type { Firework, Shadow } from './particles';
 import type { Anim, Player } from './player';
 import type { Ring } from './ring';
 import { CLASSIC_SKIN, skinById, type DolphinSkin } from './skins';
+import { STICK_REACH, type TouchView } from './touch';
 
 /* Everything drawn to the canvas: the scrolling world, the creatures, the
    dolphin, the in-game HUD and the menus. All art here is drawn in code. */
@@ -44,6 +45,10 @@ export interface RenderState {
   buttons: UIButton[];
   skin: DolphinSkin;
   multiplayer: MultiplayerView | null;
+  /* The finger currently steering, if any, so the stick can be drawn. */
+  touch: TouchView | null;
+  /* Whether to explain the controls as fingers rather than arrow keys. */
+  touchInput: boolean;
 }
 
 const FONT = '"Verdana", "Geneva", "DejaVu Sans", sans-serif';
@@ -1338,15 +1343,28 @@ const HELP_LINES = [
   ['Escape', 'Pause.'],
 ];
 
-const HELP_TIPS = [
-  'Dive deep, turn up, and hold Up for a big launch. Re-enter the water nose first for a Nice Entry and a speed boost.',
+/* The same four controls, played with fingers. Kept as short as the
+   keyboard's, so the panel still holds the tips underneath. */
+const HELP_LINES_TOUCH = [
+  ['Hold', 'Accelerate. You swim for as long as a finger is down.'],
+  ['Drag', 'Steer. The dolphin turns to point wherever your finger sits from the spot you first touched. In the air that spins it for Front and Back Flips.'],
+  ['Second finger', 'Roll for a Corkscrew, or a tailslide if you hold it as you surface.'],
+  ['Lift it again', 'Pop off the slide and launch skyward.'],
+  ['Menu', 'Pause, bottom right.'],
+];
+
+/* The two tips that name a key say the other thing on a touch screen. */
+const helpTips = (touchInput: boolean): string[] => [
+  touchInput
+    ? 'Dive deep, point back up and keep holding for a big launch. Re-enter the water nose first for a Nice Entry and a speed boost.'
+    : 'Dive deep, turn up, and hold Up for a big launch. Re-enter the water nose first for a Nice Entry and a speed boost.',
   'Chain tricks in one jump to build a multiplier. Repeating a trick counts, but adds less each time.',
   'Swim through the rings of sparks. Lead a school of fish into the air for Schooled.',
-  'Higher than the moon you will find trails of stars. Hold Down to ride them: a Starslide, and a speed bonus when you pop off.',
+  `Higher than the moon you will find trails of stars. ${touchInput ? 'A second finger' : 'Hold Down'} rides them: a Starslide, and a speed bonus when you pop off.`,
   'How high can you go? Somewhere out there is a diner.',
 ];
 
-function drawHelp(ctx: CanvasRenderingContext2D, buttons: UIButton[], hover: string | null): void {
+function drawHelp(ctx: CanvasRenderingContext2D, buttons: UIButton[], hover: string | null, touchInput: boolean): void {
   drawPanel(ctx, 50, 40, 540, 400);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -1354,7 +1372,7 @@ function drawHelp(ctx: CanvasRenderingContext2D, buttons: UIButton[], hover: str
   ctx.fillStyle = '#ffffff';
   ctx.fillText('How to play', 74, 76);
   let y = 104;
-  for (const [key, text] of HELP_LINES) {
+  for (const [key, text] of touchInput ? HELP_LINES_TOUCH : HELP_LINES) {
     ctx.font = `bold 12px ${FONT}`;
     ctx.fillStyle = '#ffe27a';
     ctx.fillText(key, 74, y);
@@ -1366,7 +1384,7 @@ function drawHelp(ctx: CanvasRenderingContext2D, buttons: UIButton[], hover: str
   }
   y += 6;
   ctx.font = `12px ${FONT}`;
-  for (const tip of HELP_TIPS) {
+  for (const tip of helpTips(touchInput)) {
     ctx.fillStyle = '#bfe3ff';
     const lines = wrapLines(ctx, '• ' + tip, 490);
     lines.forEach((line, i) => ctx.fillText(line, 74, y + i * 15));
@@ -1394,7 +1412,13 @@ function drawTitle(ctx: CanvasRenderingContext2D, state: RenderState): void {
   }
   ctx.textAlign = 'center';
   ctx.font = `bold 12px ${FONT}`;
-  outlinedText(ctx, 'Arrow keys to swim. Two minutes on the clock. Enter to start.', CX, 458, '#e8f1ff');
+  outlinedText(
+    ctx,
+    state.touchInput
+      ? 'Hold to swim, drag to steer, second finger to roll. Two minutes on the clock.'
+      : 'Arrow keys to swim. Two minutes on the clock. Enter to start.',
+    CX, 458, '#e8f1ff'
+  );
   if (level.skyMode !== 'day') {
     ctx.font = `11px ${FONT}`;
     outlinedText(ctx, level.skyMode === 'night' ? 'Night swim.' : 'Evening swim.', CX, 440, '#bfe3ff');
@@ -1450,6 +1474,40 @@ function drawEnd(ctx: CanvasRenderingContext2D, state: RenderState): void {
   for (const b of state.buttons) drawButton(ctx, b, state.hover === b.id);
 }
 
+/* The touch stick: a ring where the finger landed and a knob showing
+   which way the dolphin is being pointed. Faint on purpose — it is a
+   reminder of where the anchor is, not something to look at. */
+function drawStick(ctx: CanvasRenderingContext2D, touch: TouchView): void {
+  const dx = touch.x - touch.ax;
+  const dy = touch.y - touch.ay;
+  const distance = Math.hypot(dx, dy);
+  const reach = Math.min(distance, STICK_REACH);
+  const kx = distance > 0 ? touch.ax + (dx / distance) * reach : touch.ax;
+  const ky = distance > 0 ? touch.ay + (dy / distance) * reach : touch.ay;
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(touch.ax, touch.ay, STICK_REACH, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (distance > 0) {
+    ctx.beginPath();
+    ctx.moveTo(touch.ax, touch.ay);
+    ctx.lineTo(kx, ky);
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.arc(kx, ky, 16, 0, Math.PI * 2);
+  ctx.fillStyle = touch.grinding ? 'rgba(255,226,122,0.5)' : 'rgba(255,255,255,0.28)';
+  ctx.fill();
+  ctx.strokeStyle = touch.grinding ? 'rgba(255,226,122,0.95)' : 'rgba(255,255,255,0.6)';
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function render(ctx: CanvasRenderingContext2D, state: RenderState): void {
   const { screen, game, level, help, buttons, hover, multiplayer } = state;
   drawWorld(ctx, level, game ? game.player : null, state.frame, state.skin, multiplayer?.others ?? []);
@@ -1458,20 +1516,21 @@ export function render(ctx: CanvasRenderingContext2D, state: RenderState): void 
     drawChatBubble(ctx, game.player.x, game.player.y - 48, chatText, chatAlpha(chatText, chatUpdatedAt, performance.now()));
   }
   if (screen === 'title') {
-    if (help) drawHelp(ctx, buttons, hover);
+    if (help) drawHelp(ctx, buttons, hover, state.touchInput);
     else drawTitle(ctx, state);
     if (multiplayer && !help) drawRoster(ctx, multiplayer, false);
     return;
   }
   if (!game) return;
   drawHud(ctx, game);
+  if (state.touch) drawStick(ctx, state.touch);
   if (multiplayer && !help) drawRoster(ctx, multiplayer, true);
   for (const b of buttons) {
     if (b.id === 'ingame-menu') drawButton(ctx, b, hover === b.id);
   }
   const menuButtons = buttons.filter((b) => b.id !== 'ingame-menu');
   if (help) {
-    drawHelp(ctx, buttons.filter((b) => b.id === 'close-help'), hover);
+    drawHelp(ctx, buttons.filter((b) => b.id === 'close-help'), hover, state.touchInput);
   } else if (screen === 'end') {
     drawEnd(ctx, { ...state, buttons: menuButtons });
   } else if (game.paused) {

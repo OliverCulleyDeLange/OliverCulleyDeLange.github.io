@@ -15,6 +15,7 @@ import { loadProfile, saveProfile } from './profile';
 import { mountProfileUI, type ProfileUI } from './profile-ui';
 import { layoutButtons, render, type RenderState, type Screen, type UIButton } from './render';
 import { skinById } from './skins';
+import { TouchControls } from './touch';
 
 /* Dolphin Olympics: a port of the Flash game's mechanics to canvas.
 
@@ -76,6 +77,16 @@ function writeBest(value: number): void {
   } catch (error) {}
 }
 
+/* Phones and tablets get the touch instructions from the start, rather
+   than being told about arrow keys they do not have. */
+function matchesCoarsePointer(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch (error) {
+    return false;
+  }
+}
+
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable === true;
@@ -98,6 +109,15 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
   let lastTime = 0;
   let accumulator = 0;
   let animationFrame: number | null = null;
+
+  /* Fingers drive the same four keys as the arrows; see touch.ts. The
+     screens explain themselves in whichever language the player is
+     speaking, so a laptop with a touchscreen switches when they touch it. */
+  const touch = new TouchControls(
+    (key) => game?.keyDown(key),
+    (key) => game?.keyUp(key)
+  );
+  let touchInput = matchesCoarsePointer();
 
   /* --- multiplayer ------------------------------------------------- */
 
@@ -197,12 +217,14 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
 
   function startGame(mode: GameMode, playOnline = false): void {
     clearChat();
+    touch.reset();
     online = playOnline;
     if (online) client.connect();
     else client.disconnect();
     if (game) game.exit();
     game = new DolphinGame(level, mode);
     game.onGameEnd = (result) => {
+      touch.reset();
       stats = result;
       if (result.score > best) {
         best = result.score;
@@ -219,6 +241,7 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
 
   function goToTitle(): void {
     clearChat();
+    touch.reset();
     /* Leaving the game leaves the room too; the server tells the others. */
     client.disconnect();
     online = false;
@@ -233,6 +256,7 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
 
   function playAgain(): void {
     if (!game) return;
+    touch.reset();
     game.startGame();
     screen = 'game';
     relayout();
@@ -293,18 +317,48 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
     return null;
   }
 
+  /* Swimming, as opposed to sitting on a menu: when fingers steer. */
+  function inPlay(): boolean {
+    return screen === 'game' && game !== null && !help && !game.paused;
+  }
+
   function onPointerDown(event: PointerEvent): void {
     canvas.focus({ preventScroll: true });
+    if (event.pointerType === 'touch') touchInput = true;
     const { x, y } = toLogical(event);
     const b = buttonAt(x, y);
-    if (b) activate(b.id);
+    if (b) {
+      /* A menu tap with a second finger ends the swim rather than
+         leaving a key held down behind the pause screen. */
+      touch.reset();
+      activate(b.id);
+      return;
+    }
+    if (event.pointerType !== 'touch' || !inPlay()) return;
+    event.preventDefault();
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch (error) {}
+    touch.down(event.pointerId, x, y);
   }
 
   function onPointerMove(event: PointerEvent): void {
     const { x, y } = toLogical(event);
+    if (event.pointerType === 'touch') {
+      if (touch.active) {
+        event.preventDefault();
+        touch.move(event.pointerId, x, y);
+      }
+      return;
+    }
     const b = buttonAt(x, y);
     hover = b ? b.id : null;
     canvas.style.cursor = b ? 'pointer' : 'default';
+  }
+
+  function onPointerUp(event: PointerEvent): void {
+    if (event.pointerType !== 'touch') return;
+    touch.up(event.pointerId);
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -360,6 +414,7 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
   }
 
   function onBlur(): void {
+    touch.reset();
     if (game) game.releaseAllKeys();
   }
 
@@ -373,6 +428,7 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       steps++;
       frame++;
       if (game) {
+        if (touch.active && !game.paused) touch.update(game.player);
         game.frame();
         /* The accumulator is how far wall time has run ahead of the
            simulation, so this stamp is when the step just taken landed.
@@ -393,6 +449,8 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       frame,
       buttons,
       skin,
+      touch: inPlay() ? touch.view : null,
+      touchInput,
       multiplayer: online
         ? {
             status: client.status,
@@ -413,6 +471,8 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
   document.addEventListener('keyup', onKeyup);
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerUp);
   const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => resize()) : null;
   resizeObserver?.observe(canvas);
 
@@ -435,6 +495,8 @@ export function createDolphinOlympics(canvas: HTMLCanvasElement, options: Dolphi
       document.removeEventListener('keyup', onKeyup);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
       resizeObserver?.disconnect();
       if (animationFrame != null) cancelAnimationFrame(animationFrame);
       if (game) game.exit();
