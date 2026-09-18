@@ -5,20 +5,36 @@
 export interface DesktopFolder {
   id: string;
   name: string;
-  /** MacIcon glyph shown on the desktop and in the dock. */
-  icon: string;
+  /** MacIcon glyph worn on the folder's face. Omit for a plain folder. */
+  icon?: string;
   /** Desktop icon ids (project ids, or shortcuts such as 'cv') that start inside. */
   items: string[];
-  /** Slot in the top-left icon flow, on the same scale as a project's `order`. */
+  /** Slot among the folders, which lead the top-left icon flow ahead of
+      the apps. Blog is rendered first and takes no slot. */
   order: number;
 }
 
 export const desktopFolders: DesktopFolder[] = [
   {
+    id: 'games',
+    name: 'Games',
+    icon: 'games',
+    items: [
+      'pinball', 'dolphin-olympics', 'six-second-scribbles',
+      'language-guesser', 'memory',
+    ],
+    order: 1,
+  },
+  {
     id: 'house-stuff',
     name: 'House Stuff',
     icon: 'home',
     items: ['mortgage-calculator', 'home-survey-levels'],
-    order: 3,
+    order: 2,
   },
 ];
+
+/* What MacIcon should draw for a folder: the plain folder glyph, or that
+   glyph with the folder's own icon riding on its face. */
+export const folderIcon = (folder: DesktopFolder): string =>
+  folder.icon ? `folder:${folder.icon}` : 'folder';
