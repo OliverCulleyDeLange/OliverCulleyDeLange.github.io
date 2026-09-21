@@ -55,10 +55,27 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
   let speed = readSpeed();
   let foodEaten = 0;
   const heldArrowKeys = new Set();
-  let lastStep = 0;
-  let animationFrame: number | null = null;
+  let stepTimer: number | null = null;
+  /* Swipes on the empty desktop area let mobile users control the snake.
+     The canvas itself has pointer-events: none, so touches on visual snake
+     space still reach the desktop container behind it. */
+  const SWIPE_THRESHOLD = 24;
+  let touchStart: { x: number; y: number } | null = null;
+  const desktopEl = snakeCanvas.parentElement;
+  /* Colours come from CSS custom properties, so getComputedStyle is expensive.
+     Cache them and refresh only when the theme actually changes. */
+  let cachedInk = '';
+  let cachedPaper = '';
+  let coloursDirty = true;
 
   const isEnabled = () => speed !== 'disabled';
+
+  function refreshColours() {
+    const styles = getComputedStyle(document.documentElement);
+    cachedInk = styles.getPropertyValue('--ink').trim();
+    cachedPaper = styles.getPropertyValue('--paper').trim();
+    coloursDirty = false;
+  }
 
   function resize() {
     const rect = snakeCanvas.getBoundingClientRect();
@@ -71,6 +88,7 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
       rows: Math.max(8, Math.floor(rect.height / CELL_SIZE)),
     };
     reset();
+    draw();
   }
 
   function randomOpenCell() {
@@ -134,20 +152,15 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
     } else snake.pop();
   }
 
-  function colours() {
-    const styles = getComputedStyle(document.documentElement);
-    return { ink: styles.getPropertyValue('--ink').trim(), paper: styles.getPropertyValue('--paper').trim() };
-  }
-
   function draw() {
-    const { ink, paper } = colours();
+    if (coloursDirty) refreshColours();
     const width = snakeCanvas.clientWidth;
     const height = snakeCanvas.clientHeight;
     ctx.clearRect(0, 0, width, height);
     if (!isEnabled()) return;
 
-    ctx.fillStyle = paper;
-    ctx.strokeStyle = ink;
+    ctx.fillStyle = cachedPaper;
+    ctx.strokeStyle = cachedInk;
     ctx.lineWidth = 1;
     snake.forEach((segment, index) => {
       const x = segment.x * CELL_SIZE;
@@ -155,26 +168,37 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
       ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
       ctx.strokeRect(x + 1.5, y + 1.5, CELL_SIZE - 3, CELL_SIZE - 3);
       if (index === 0) {
-        ctx.fillStyle = ink;
+        ctx.fillStyle = cachedInk;
         ctx.fillRect(x + 4, y + 4, 2, 2);
         ctx.fillRect(x + 8, y + 4, 2, 2);
-        ctx.fillStyle = paper;
+        ctx.fillStyle = cachedPaper;
       }
     });
-    ctx.fillStyle = ink;
+    ctx.fillStyle = cachedInk;
     ctx.fillRect(food.x * CELL_SIZE + 3, food.y * CELL_SIZE + 3, CELL_SIZE - 6, CELL_SIZE - 6);
   }
 
-  function tick(time: number): void {
+  function stepInterval(): number {
     const foodSpeed = Math.pow(1 + SPEED_MULTIPLIERS[speed] / 100, foodEaten);
     const heldKeySpeed = heldArrowKeys.size ? 2 : 1;
-    const stepInterval = SPEEDS[speed] / foodSpeed / heldKeySpeed;
-    if (isEnabled() && time - lastStep >= stepInterval) {
+    return SPEEDS[speed] / foodSpeed / heldKeySpeed;
+  }
+
+  function scheduleNextStep() {
+    if (stepTimer !== null || !isEnabled() || document.hidden) return;
+    stepTimer = window.setTimeout(() => {
+      stepTimer = null;
       step();
-      lastStep = time;
+      draw();
+      scheduleNextStep();
+    }, stepInterval());
+  }
+
+  function stopStepping() {
+    if (stepTimer !== null) {
+      clearTimeout(stepTimer);
+      stepTimer = null;
     }
-    draw();
-    animationFrame = requestAnimationFrame(tick);
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -195,25 +219,84 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
     heldArrowKeys.clear();
   }
 
+  function onTouchStart(event: TouchEvent): void {
+    if (!isEnabled() || document.documentElement.classList.contains('is-locked')) { touchStart = null; return; }
+    if (event.touches.length !== 1) { touchStart = null; return; }
+    /* The desk-icons <ul> fills the whole desktop, so plain background touches
+       land on it rather than on .desktop itself. Accept anything within the
+       desktop that isn't a desk-icon — windows live outside .desktop. */
+    if (!(event.target instanceof Element) || event.target.closest('.desk-icon')) { touchStart = null; return; }
+    const touch = event.touches[0];
+    touchStart = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function onTouchEnd(event: TouchEvent): void {
+    if (!touchStart) return;
+    const start = touchStart;
+    touchStart = null;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (Math.max(absX, absY) < SWIPE_THRESHOLD) return;
+    const movement = absX > absY
+      ? (dx > 0 ? DIRECTIONS.ArrowRight : DIRECTIONS.ArrowLeft)
+      : (dy > 0 ? DIRECTIONS.ArrowDown : DIRECTIONS.ArrowUp);
+    const reversing = movement.x === -direction.x && movement.y === -direction.y;
+    if (!reversing) direction = movement;
+    playerControlled = true;
+  }
+
+  function onTouchCancel() {
+    touchStart = null;
+  }
+
+  function onVisibilityChange() {
+    if (document.hidden) stopStepping();
+    else scheduleNextStep();
+  }
+
   function setSpeed(nextSpeed: Speed): void {
     if (!Object.hasOwn(SPEEDS, nextSpeed)) return;
     speed = nextSpeed;
     try { localStorage.setItem(SPEED_STORAGE_KEY, speed); } catch (error) {}
     snakeCanvas.hidden = !isEnabled();
+    stopStepping();
     if (isEnabled()) {
       playerControlled = false;
       reset();
+      draw();
+      scheduleNextStep();
+    } else {
+      draw();
     }
-    lastStep = performance.now();
   }
+
+  /* Watch data-theme changes so cached CSS colours stay accurate without
+     re-reading getComputedStyle on every frame. */
+  const themeObserver = new MutationObserver(() => {
+    coloursDirty = true;
+    draw();
+  });
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+
+  const systemThemeMedia = window.matchMedia?.('(prefers-color-scheme: dark)');
+  const onSystemThemeChange = () => { coloursDirty = true; draw(); };
+  systemThemeMedia?.addEventListener?.('change', onSystemThemeChange);
 
   window.addEventListener('resize', resize);
   window.addEventListener('blur', onWindowBlur);
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('keyup', onKeyup);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  desktopEl?.addEventListener('touchstart', onTouchStart, { passive: true });
+  desktopEl?.addEventListener('touchend', onTouchEnd, { passive: true });
+  desktopEl?.addEventListener('touchcancel', onTouchCancel, { passive: true });
   snakeCanvas.hidden = !isEnabled();
   resize();
-  animationFrame = requestAnimationFrame(tick);
+  scheduleNextStep();
 
   return {
     currentSpeed: () => speed,
@@ -224,7 +307,13 @@ export function createAmbientSnake(canvas: HTMLCanvasElement | null) {
       window.removeEventListener('blur', onWindowBlur);
       document.removeEventListener('keydown', onKeydown);
       document.removeEventListener('keyup', onKeyup);
-      if (animationFrame) cancelAnimationFrame(animationFrame);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      desktopEl?.removeEventListener('touchstart', onTouchStart);
+      desktopEl?.removeEventListener('touchend', onTouchEnd);
+      desktopEl?.removeEventListener('touchcancel', onTouchCancel);
+      systemThemeMedia?.removeEventListener?.('change', onSystemThemeChange);
+      themeObserver.disconnect();
+      stopStepping();
     },
   };
 }
