@@ -14,13 +14,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <canvas
         id="dolphin-canvas"
         class="game-canvas"
-        aria-label="Dolphin Olympics. Hold the up arrow to accelerate. Left and right turn underwater and spin in the air for flips. Down rolls for a corkscrew, and held as you surface starts a tailslide along the water; press up to pop off it. Escape pauses. Original game by Alan Rawkins. You have two minutes to score as many tricks as you can and climb as high as you dare. Choose Play Online and other players swim in the same sea as ghosts with their name and flag; type normally while swimming online to talk above your dolphin."
+        aria-label="Dolphin Olympics. Hold the up arrow to accelerate. Left and right turn underwater and spin in the air for flips. Down rolls for a corkscrew, and held as you surface starts a tailslide along the water; press up to pop off it. Escape pauses. On a touch screen, hold anywhere to accelerate, drag around the point you touched to steer the dolphin that way, and hold a second finger to roll and tailslide. Original game by Alan Rawkins. You have two minutes to score as many tricks as you can and climb as high as you dare. Choose Play Online and other players swim in the same sea as ghosts with their name and flag; type normally while swimming online to talk above your dolphin."
       ></canvas>
     </div>
+    <button type="button" id="dolphin-fullscreen" class="dolphin-fullscreen" hidden>Fullscreen</button>
     <p class="dolphin-credit">
       A tribute port of <em>Dolphin Olympics 2</em>, the Flash game by Alan Rawkins &mdash;
       <a href="https://www.rawkins.com" target="_blank" rel="noopener">rawkins.com</a>.
       Choose <em>Play Online</em> to swim in the same sea as everyone else; type while swimming to talk, or add <code>?room=yourname</code> to the URL for a private room.
+      On a phone: hold to swim, drag around where you touched to steer, and a second finger rolls and tailslides.
     </p>
   </section>
 </BaseLayout>
@@ -37,6 +39,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     font-family: var(--font-ui);
     font-size: 0.75rem;
     color: var(--muted);
+  }
+
+  /* Only offered where it helps: a phone in landscape gets a much bigger
+     stage than the page can give it. */
+  .dolphin-fullscreen {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--text);
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+  }
+
+  .dolphin-canvas-wrap:fullscreen {
+    background: #000;
+    padding: 0;
   }
 
   .dolphin-credit a { color: var(--accent); }
@@ -133,4 +153,31 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   const canvas = document.getElementById('dolphin-canvas') as HTMLCanvasElement;
   createDolphinOlympics(canvas, { profileRoot: document.getElementById('dolphin-profile') });
+
+  /* A 640x480 stage inside a portrait phone is tiny. Fullscreen (plus a
+     landscape lock where the browser allows one) roughly doubles it, so
+     touch players are offered it — and nobody else, since a desktop
+     window is big enough already. */
+  const wrap = canvas.closest('.dolphin-canvas-wrap') as HTMLElement | null;
+  const button = document.getElementById('dolphin-fullscreen') as HTMLButtonElement | null;
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  if (wrap && button && coarse && document.fullscreenEnabled) {
+    button.hidden = false;
+    button.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else {
+          await wrap.requestFullscreen();
+          /* Not everywhere, and never on iOS: a rejection is fine. */
+          await (screen.orientation as any)?.lock?.('landscape').catch(() => {});
+        }
+      } catch (error) {}
+    });
+    document.addEventListener('fullscreenchange', () => {
+      button.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+      if (!document.fullscreenElement) {
+        try { (screen.orientation as any)?.unlock?.(); } catch (error) {}
+      }
+    });
+  }
 </script>

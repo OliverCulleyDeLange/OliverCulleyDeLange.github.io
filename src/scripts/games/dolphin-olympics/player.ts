@@ -277,8 +277,10 @@ export class Player {
     }
   }
 
-  private turn(dir: 'left' | 'right'): void {
-    const sign = dir === 'left' ? -1 : 1;
+  /* Degrees one frame of turning moves the heading: faster as the dolphin
+     picks up speed, floored in the air so a stall can still be steered.
+     The touch stick reads it to know when a heading is close enough. */
+  get turnRate(): number {
     let amount = this.vz / TURN_RADIUS + MIN_TURN;
     if (amount > MAX_TURN) amount = MAX_TURN;
     else if (amount < -MAX_TURN) amount = -MAX_TURN;
@@ -287,11 +289,15 @@ export class Player {
       if (amount < airMin && amount > 0) amount = airMin;
       else if (amount > -airMin && amount < 0) amount = -airMin;
       if (this.rolling) amount /= 1.3;
-      this.spinDegs += sign * amount;
-      this._angle += sign * amount;
-    } else {
-      this._angle += sign * amount;
     }
+    return amount;
+  }
+
+  private turn(dir: 'left' | 'right'): void {
+    const sign = dir === 'left' ? -1 : 1;
+    const amount = this.turnRate;
+    if (this.jumping) this.spinDegs += sign * amount;
+    this._angle += sign * amount;
     if (this._angle < 0) this._angle += 360;
     else if (this._angle > 360) this._angle -= 360;
   }
