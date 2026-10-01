@@ -20,7 +20,7 @@ export const desktopFolders: DesktopFolder[] = [
     name: 'Games',
     icon: 'games',
     items: [
-      'pinball', 'dolphin-olympics', 'tiles', 'six-second-scribbles',
+      'pinball', 'dolphin-olympics', 'six-second-scribbles',
       'language-guesser', 'memory',
     ],
     order: 1,
