@@ -9,7 +9,7 @@ interface Props {
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'survey' | 'memory'
     | 'scribbles' | 'location-alarm' | 'climb' | 'map'
-    | 'pinball' | 'dolphin-olympics'
+    | 'pinball' | 'dolphin-olympics' | 'tiles'
     /* A folder carrying a glyph on its face, e.g. 'folder:home'. */
     | `folder:${string}`;
   size?: number;
@@ -356,6 +356,22 @@ const letterO: [number, number, number][] = [
       <path d="M11.2 5 13.75 3.6 12.1 6.4Z"/>
       <path d="M5.25 7.75 2.95 9.85 4.8 6.6Z"/>
       <path d="M7.55 4.3 8.7 1.35 9.6 4.55Z"/>
+    </g>
+  </svg>
+)}
+{name === 'tiles' && (
+  /* Tiles — a tight little crossword made from letter tiles. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <g fill="var(--paper)" stroke="currentColor" stroke-width="1">
+      <rect x="0" y="5" width="4" height="5"/>
+      <rect x="4" y="5" width="4" height="5"/>
+      <rect x="8" y="5" width="4" height="5"/>
+      <rect x="12" y="5" width="4" height="5"/>
+      <rect x="4" y="10" width="4" height="5"/>
+    </g>
+    <g fill="currentColor" font-family="Georgia,serif" font-size="4" font-weight="bold" text-anchor="middle">
+      <text x="2" y="8.7">T</text><text x="6" y="8.7">I</text><text x="10" y="8.7">L</text><text x="14" y="8.7">E</text>
+      <text x="6" y="13.7">S</text>
     </g>
   </svg>
 )}
