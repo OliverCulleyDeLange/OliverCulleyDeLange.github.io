@@ -12,6 +12,7 @@ export const projectIcons: Record<string, string> = {
   'map-playground': 'map',
   'pinball': 'pinball',
   'dolphin-olympics': 'dolphin-olympics',
+  'tiles': 'tiles',
 };
 
 export const iconFor = (id: string): string => projectIcons[id] ?? 'app';
