@@ -1,0 +1,40 @@
+---
+name: "Trip Scheduler"
+tagline: "Plan group trips without the spreadsheet"
+githubUrl: "https://github.com/OliverCulleyDeLange/trip-scheduler"
+order: 0
+---
+
+Planning a group trip normally means a spreadsheet, a date poll, a group chat and dozens of links. I wanted one shared place where friends could work out when they are free, compare transport and accommodation, organise rooms and beds, and gradually turn a set of options into a booked trip.
+
+## Why I built it
+
+The immediate problem was planning a ski trip. People were travelling from different places, bringing different bags, and had different expectations about dates, rooms and bed sharing. My spreadsheet could hold the answers, but it could not collect them or show the plan clearly.
+
+There are plenty of tools that generate a polished itinerary or an AI-produced PDF. That feels like the wrong end of the problem. A trip plan changes constantly while a group is deciding. It should be a living, editable website rather than a static document.
+
+## The prototype
+
+The first version focuses on manually entered information:
+
+- multiple potential date ranges and a group availability poll
+- people, addresses, room preferences, bed-sharing preferences and baggage
+- transport options with mode-specific details and travellers
+- accommodation options with explicit rooms and beds
+- generic activity suggestions and voting
+- an itinerary and maps built with MapLibre
+- local IndexedDB persistence plus versioned JSON export and import
+
+Anyone in the group can edit anyone's information. That is deliberate: this is designed for a group of friends planning together, not for organisational permissions and admin roles.
+
+## Designing it by using it
+
+I built the frontend first with a repository interface and an in-memory/local implementation. I am using it to plan a real trip, finding awkward parts of the workflow and changing the design as I go. That has already been more useful than trying to specify the whole product up front.
+
+The app started inside this website repository while the interaction model was changing quickly. Once the prototype became useful, I extracted it into its own [Trip Scheduler repository](https://github.com/OliverCulleyDeLange/trip-scheduler) so the website can remain a write-up and the application can be deployed independently.
+
+## Next
+
+The next version will run on Cloudflare with shared trip data in D1, private editable links, anonymous signed browser sessions and optional password protection. Social login, fixed membership, change history and automatic travel-price aggregation can wait until the collaborative core works well.
+
+The important migration feature is already present: trips can be exported as versioned JSON and imported into another browser, so real planning data does not have to be re-entered while the backend changes.
