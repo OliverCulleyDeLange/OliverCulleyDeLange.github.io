@@ -31,6 +31,8 @@ const OFFLINE_FALLBACK = '/';
 /* What a page posts once it is loaded and idle enough to spare the
    bandwidth. See the registration snippet in BaseLayout.astro. */
 const CACHE_MEDIA = 'odl-cache-media';
+const CHECK_PAGE = 'odl-check-page';
+const PAGE_UPDATE_READY = 'odl-page-update-ready';
 
 /* One pass at a time, however many tabs ask for one. */
 let mediaPass = null;
@@ -55,9 +57,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data !== CACHE_MEDIA || saveData()) return;
-  if (!mediaPass) mediaPass = cacheMedia().finally(() => { mediaPass = null; });
-  event.waitUntil(mediaPass);
+  if (event.data === CACHE_MEDIA) {
+    if (saveData()) return;
+    if (!mediaPass) mediaPass = cacheMedia().finally(() => { mediaPass = null; });
+    event.waitUntil(mediaPass);
+    return;
+  }
+
+  if (event.data?.type === CHECK_PAGE && typeof event.data.url === 'string') {
+    const url = new URL(event.data.url, self.location.origin);
+    if (url.origin !== self.location.origin) return;
+    event.waitUntil(refreshPage(url, event.source?.id));
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -73,6 +84,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(page(request, url));
+    event.waitUntil(refreshPage(url, event.resultingClientId || event.clientId));
     return;
   }
   event.respondWith(asset(request));
@@ -94,6 +106,49 @@ async function page(request, url) {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
   }
+}
+
+/* Keep serving the reliable cached page, but check the network alongside
+   it. If the document changed, cache the new copy and let the open app ask
+   the visitor when to reload. This preserves offline support without
+   pinning separately deployed pages to an old release forever. */
+async function refreshPage(url, clientId) {
+  const key = documentKey(url);
+  const cached = await caches.match(key, { ignoreSearch: true });
+  let response;
+  try {
+    response = await fetch(new Request(url, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'text/html' },
+    }));
+  } catch (error) {
+    return;
+  }
+  if (!response.ok || response.type !== 'basic') return;
+
+  const changed = cached ? await responsesDiffer(cached, response) : false;
+  await (await caches.open(CACHE)).put(key, response.clone());
+  if (!changed) return;
+
+  const client = clientId ? await self.clients.get(clientId) : null;
+  if (client) {
+    client.postMessage({ type: PAGE_UPDATE_READY, url: key });
+    return;
+  }
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: false });
+  for (const candidate of clients) {
+    if (documentKey(new URL(candidate.url)) === key) {
+      candidate.postMessage({ type: PAGE_UPDATE_READY, url: key });
+    }
+  }
+}
+
+async function responsesDiffer(cached, fresh) {
+  const cachedTag = cached.headers.get('etag');
+  const freshTag = fresh.headers.get('etag');
+  if (cachedTag && freshTag) return cachedTag !== freshTag;
+  return (await cached.clone().text()) !== (await fresh.clone().text());
 }
 
 /* Everything else: cache first, since a built asset's name changes when
