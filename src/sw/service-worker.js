@@ -34,6 +34,11 @@ const CACHE_MEDIA = 'odl-cache-media';
 const CHECK_PAGE = 'odl-check-page';
 const PAGE_UPDATE_READY = 'odl-page-update-ready';
 
+/* Apps deployed independently under this origin own their own release and
+   caching lifecycle. Intercepting them here can leave cached HTML pointing at
+   content-hashed assets that their next deployment has removed. */
+const INDEPENDENT_APPS = ['/tiles'];
+
 /* One pass at a time, however many tabs ask for one. */
 let mediaPass = null;
 
@@ -78,6 +83,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   /* Analytics and the multiplayer relay are someone else's problem. */
   if (url.origin !== self.location.origin) return;
+  if (INDEPENDENT_APPS.some(path => url.pathname === path || url.pathname.startsWith(`${path}/`))) return;
   /* Video arrives in ranges; passing those through the cache goes wrong
      in ways that are worse than the video simply not playing offline. */
   if (request.headers.has('range') || isVideo(url.pathname)) return;
