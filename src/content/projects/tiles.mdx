@@ -1,16 +1,18 @@
 ---
 name: "Tiles"
-tagline: "A frantic real-time crossword race for up to eight players"
+tagline: "Play Bananagrams with friends without internet"
 appUrl: "https://oliverdelange.co.uk/tiles/"
 appLabel: "Play Tiles"
 githubUrl: "https://github.com/OliverCulleyDeLange/tiles"
 order: 10
 ---
 
-Tiles is a real-time, shared-table word game inspired by the speed and tactile chaos of playing with physical letter tiles. Two to eight players build their own connected crosswords simultaneously while seeing everyone else's tiles around the same virtual table.
+My partner and I love Bananagrams, but playing on a train or plane is awkward. Online versions exist, but need reliable internet. So I built **Tiles**, an internet-free, real-time version of Bananagrams for two to eight players.
 
-The board is designed to feel spatial rather than document-like: players sit around a table, their areas are outlined in colour, and the whole surface can be panned, zoomed, or rotated with touch and trackpad gestures. Tiles can be dragged individually or as a selection, and loose letters can be tapped into an emerging word.
+## Web or native?
 
-Rooms use private shareable links and synchronize through a Cloudflare Durable Object. US and British SCOWL dictionaries provide live word validation, and peeling is held until every word in a player's grid is valid. Native iOS and Android wrappers add nearby offline play over Bluetooth and peer-to-peer Wi-Fi for places where internet access is unavailable.
+The [**web version**](https://oliverdelange.co.uk/tiles/) needs internet: create a private lobby and share its link. The **native iOS and Android versions** can also play offline over Bluetooth and peer-to-peer Wi-Fi.
 
-The project is built with **Astro**, **TypeScript**, **Capacitor**, and **Cloudflare Workers**.
+They are not in the app stores because I'm too cheap to pay Apple and Google. You can build and install them from the [GitHub source](https://github.com/OliverCulleyDeLange/tiles) using Xcode or Android Studio.
+
+Built with **Astro**, **TypeScript**, **Capacitor** and **Cloudflare Workers**, with live SCOWL dictionary validation.
