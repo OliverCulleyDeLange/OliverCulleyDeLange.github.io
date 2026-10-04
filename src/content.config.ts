@@ -18,6 +18,7 @@ const projects = defineCollection({
     name: z.string(),
     tagline: z.string(),
     appUrl: z.string().optional(),
+    devAppUrl: z.string().optional(),
     appLabel: z.string().optional().default('Open app'),
     githubUrl: z.string().url().optional(),
     relatedPosts: z.array(z.string()).optional().default([]),

@@ -3,6 +3,7 @@
 export const projectIcons: Record<string, string> = {
   'free-custom-ecards': 'ecards',
   'grvmkr': 'grvmkr',
+  'trip-scheduler': 'trip-scheduler',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',
   'home-survey-levels': 'survey',

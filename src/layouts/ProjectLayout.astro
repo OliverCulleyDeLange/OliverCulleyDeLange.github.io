@@ -8,7 +8,8 @@ interface Props {
 }
 
 const { project } = Astro.props;
-const { name, tagline, appUrl, appLabel, githubUrl, relatedPosts } = project.data;
+const { name, tagline, appUrl, devAppUrl, appLabel, githubUrl, relatedPosts } = project.data;
+const resolvedAppUrl = import.meta.env.DEV && devAppUrl ? devAppUrl : appUrl;
 
 // Load related blog posts
 const allPosts = await getCollection('posts');
@@ -21,8 +22,8 @@ linked.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
       <h1>{name}</h1>
       <p class="project-tagline">{tagline}</p>
       <div class="project-links">
-        {appUrl && (
-          <a href={appUrl} class="btn btn-primary" target="_blank" rel="noopener">{appLabel ?? 'Open app'}</a>
+        {resolvedAppUrl && (
+          <a href={resolvedAppUrl} class="btn btn-primary" target="_blank" rel="noopener">{appLabel ?? 'Open app'}</a>
         )}
         {githubUrl && (
           <a href={githubUrl} class="btn btn-ghost" target="_blank" rel="noopener" aria-label="View source on GitHub">

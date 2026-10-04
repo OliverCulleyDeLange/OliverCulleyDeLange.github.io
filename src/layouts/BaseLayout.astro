@@ -38,8 +38,12 @@ const byDateDesc = (a: (typeof allPosts)[number], b: (typeof allPosts)[number]) 
 
 /* Projects menu launches the deployed app when there is one, otherwise the
    project page. A related post is a dev log, never the project's own page. */
+const projectAppUrl = (project: (typeof projects)[number]) =>
+  import.meta.env.DEV && project.data.devAppUrl
+    ? project.data.devAppUrl
+    : project.data.appUrl;
 const projectHref = (project: (typeof projects)[number]) =>
-  project.data.appUrl ?? `/projects/${project.id}/`;
+  projectAppUrl(project) ?? `/projects/${project.id}/`;
 const isExternal = (href: string) => /^https?:\/\//.test(href);
 
 /* Blog menu is tiered: a submenu per project that has more than one post.
@@ -100,7 +104,7 @@ const desktopData = {
     id: project.id,
     name: project.data.name,
     tagline: project.data.tagline,
-    appUrl: project.data.appUrl ?? null,
+    appUrl: projectAppUrl(project) ?? null,
     icon: iconFor(project.id),
     standalone: project.data.standalone,
   })),
