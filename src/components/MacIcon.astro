@@ -9,7 +9,7 @@ interface Props {
     /* Project icons — one per app on the homepage. */
     | 'grvmkr' | 'schengen' | 'mortgage' | 'survey' | 'memory'
     | 'scribbles' | 'location-alarm' | 'climb' | 'map'
-    | 'pinball' | 'dolphin-olympics' | 'tiles'
+    | 'pinball' | 'dolphin-olympics' | 'tiles' | 'ecards'
     /* A folder carrying a glyph on its face, e.g. 'folder:home'. */
     | `folder:${string}`;
   size?: number;
@@ -324,6 +324,14 @@ const letterO: [number, number, number][] = [
       <rect x="7" y="9" width="2" height="4"/>
       <rect x="11" y="9" width="2" height="4"/>
     </g>
+  </svg>
+)}
+{name === 'ecards' && (
+  /* A folded greeting card with a tiny heart on the cover. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M2 2h9v2h3v10H5v-2H2V2Z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <path d="M5 4h9M5 4v10" fill="none" stroke="currentColor" stroke-width="1"/>
+    <path d="M8 7h1v-1h2v1h1v2h-1v1h-1v1H9v-1H8V9H7V7h1Z" fill="currentColor"/>
   </svg>
 )}
 {name === 'climb' && (

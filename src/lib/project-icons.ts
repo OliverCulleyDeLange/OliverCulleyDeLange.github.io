@@ -1,6 +1,7 @@
 /* Project id → MacIcon glyph. Shared by the home page and the desktop so the
    two can't drift apart. Anything unmapped falls back to the 'app' diamond. */
 export const projectIcons: Record<string, string> = {
+  'free-custom-ecards': 'ecards',
   'grvmkr': 'grvmkr',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',

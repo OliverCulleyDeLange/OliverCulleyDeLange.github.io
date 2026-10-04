@@ -9,6 +9,7 @@ const projects = (await getCollection('projects')).sort(
 
 /* Project id → MacIcon glyph. Falls back to the generic 'app' diamond. */
 const projectIcons: Record<string, Parameters<typeof MacIcon>[0]['name']> = {
+  'free-custom-ecards': 'ecards',
   'grvmkr': 'grvmkr',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',
