@@ -1,6 +1,6 @@
 ---
 date: 2026-10-04
-title: "Free Custom Ecards: Making Group Cards Less Rubbish"
+title: "E-Cards: Making Group Cards Less Rubbish"
 categories: projects
 tags: ["web", "software", "ecards", "nextjs", "supabase", "realtime"]
 description: "Building a collaborative ecard maker with real art, live group signing and email delivery."
@@ -8,7 +8,7 @@ description: "Building a collaborative ecard maker with real art, live group sig
 
 # TLDR
 
-I built [Free Custom Ecards](https://oliverdelange.co.uk/ecard/), originally called Artycards. It lets you choose some art, customise a card, invite a group of people to sign it together, and send the result by email. It is free while I build it.
+I built [E-Cards](https://oliverdelange.co.uk/ecard/), originally called Artycards. It lets you choose some art, customise a card, invite a group of people to sign it together, and send the result by email. It is free while I build it.
 
 # Why?
 
