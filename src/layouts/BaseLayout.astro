@@ -163,6 +163,32 @@ const iconNames = [...new Set([
     <link rel="preload" href="/fonts/ChiKareGo2.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/styles/global.css" />
     <script is:inline>
+      /* Older root workers may have cached the homepage as the offline
+         fallback for /tiles before Tiles gained its own scoped worker. If
+         that stale homepage is ever served here, release the root worker and
+         retry the real independently deployed app once. */
+      (function () {
+        var path = location.pathname;
+        if (path !== '/tiles' && !path.startsWith('/tiles/')) return;
+        var recoveryKey = 'tiles-root-sw-recovery';
+        if (sessionStorage.getItem(recoveryKey) === '1') return;
+        sessionStorage.setItem(recoveryKey, '1');
+        if (!('serviceWorker' in navigator)) {
+          location.reload();
+          return;
+        }
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          return Promise.all(registrations.filter(function (registration) {
+            return new URL(registration.scope).pathname === '/';
+          }).map(function (registration) {
+            return registration.unregister();
+          }));
+        }).finally(function () {
+          location.reload();
+        });
+      })();
+    </script>
+    <script is:inline>
       try {
         var saved = JSON.parse(localStorage.getItem('odl-theme'));
         if (saved === 'light' || saved === 'dark') {
