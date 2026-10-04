@@ -2,6 +2,7 @@
    two can't drift apart. Anything unmapped falls back to the 'app' diamond. */
 export const projectIcons: Record<string, string> = {
   'grvmkr': 'grvmkr',
+  'trip-scheduler': 'trip-scheduler',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',
   'home-survey-levels': 'survey',

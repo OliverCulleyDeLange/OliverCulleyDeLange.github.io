@@ -7,7 +7,7 @@ interface Props {
     /* Social icons — pinned top-right on the desktop. */
     | 'github' | 'linkedin'
     /* Project icons — one per app on the homepage. */
-    | 'grvmkr' | 'schengen' | 'mortgage' | 'survey' | 'memory'
+    | 'grvmkr' | 'trip-scheduler' | 'schengen' | 'mortgage' | 'survey' | 'memory'
     | 'scribbles' | 'location-alarm' | 'climb' | 'map'
     | 'pinball' | 'dolphin-olympics'
     /* A folder carrying a glyph on its face, e.g. 'folder:home'. */
@@ -184,6 +184,20 @@ const letterO: [number, number, number][] = [
     </g>
     {/* Outer ink border */}
     <rect x="0.5" y="0.5" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1"/>
+  </svg>
+)}
+{name === 'trip-scheduler' && (
+  /* Trip Scheduler — a calendar page crossed by a simple journey route.
+     The two stops make it read as collaborative travel rather than a
+     generic calendar when rendered at desktop-icon size. */
+  <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+    <path d="M2 3h12v12H2z" fill="var(--paper)" stroke="currentColor" stroke-width="1"/>
+    <path d="M2 6h12M5 1v4M11 1v4" fill="none" stroke="currentColor" stroke-width="1"/>
+    <path d="M5 10h2l2 2h2" fill="none" stroke="currentColor" stroke-width="1"/>
+    <rect x="4" y="9" width="3" height="3" fill="currentColor"/>
+    <rect x="10" y="11" width="3" height="3" fill="currentColor"/>
+    <rect x="5" y="10" width="1" height="1" fill="var(--paper)"/>
+    <rect x="11" y="12" width="1" height="1" fill="var(--paper)"/>
   </svg>
 )}
 {name === 'schengen' && (

@@ -10,6 +10,7 @@ const projects = (await getCollection('projects')).sort(
 /* Project id → MacIcon glyph. Falls back to the generic 'app' diamond. */
 const projectIcons: Record<string, Parameters<typeof MacIcon>[0]['name']> = {
   'grvmkr': 'grvmkr',
+  'trip-scheduler': 'trip-scheduler',
   'schengen-calculator': 'schengen',
   'mortgage-calculator': 'mortgage',
   'memory': 'memory',
@@ -28,9 +29,10 @@ const posts = (await getCollection('posts')).sort(
     <h2 class="section-heading">Applications</h2>
     <ul class="project-cards">
       {projects.map(project => {
-        const { name, tagline, appUrl, appLabel, githubUrl, standalone } = project.data;
+        const { name, tagline, appUrl, devAppUrl, appLabel, githubUrl, standalone } = project.data;
+        const resolvedAppUrl = import.meta.env.DEV && devAppUrl ? devAppUrl : appUrl;
         // Standalone apps have no Info page: the app is the whole experience.
-        const primaryHref = standalone ? appUrl! : `/projects/${project.id}/`;
+        const primaryHref = standalone ? resolvedAppUrl! : `/projects/${project.id}/`;
         return (
           <li class="project-card">
             <div class="project-card-body">
@@ -51,8 +53,8 @@ const posts = (await getCollection('posts')).sort(
               {!standalone && (
                 <a href={primaryHref} class="btn btn-ghost btn-sm">Get Info</a>
               )}
-              {appUrl && (
-                <a href={appUrl} class="btn btn-primary btn-sm" target="_blank" rel="noopener">{appLabel ?? 'Open'}</a>
+              {resolvedAppUrl && (
+                <a href={resolvedAppUrl} class="btn btn-primary btn-sm" target="_blank" rel="noopener">{appLabel ?? 'Open'}</a>
               )}
             </div>
           </li>
