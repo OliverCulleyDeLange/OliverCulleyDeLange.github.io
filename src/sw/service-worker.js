@@ -39,6 +39,10 @@ const PAGE_UPDATE_READY = 'odl-page-update-ready';
    content-hashed assets that their next deployment has removed. */
 const INDEPENDENT_APPS = ['/tiles'];
 
+function isIndependentApp(pathname) {
+  return INDEPENDENT_APPS.some(path => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 /* One pass at a time, however many tabs ask for one. */
 let mediaPass = null;
 
@@ -58,6 +62,13 @@ self.addEventListener('activate', (event) => {
     const names = await caches.keys();
     await Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name)));
     await self.clients.claim();
+    /* A previous worker may already have served the cached homepage for an
+       independent app route. Reload only those windows still controlled by
+       this root worker; the retry bypasses us and reaches the app itself. */
+    const windows = await self.clients.matchAll({ type: 'window' });
+    await Promise.all(windows
+      .filter(client => isIndependentApp(new URL(client.url).pathname))
+      .map(client => client.navigate(client.url)));
   })());
 });
 
@@ -83,7 +94,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   /* Analytics and the multiplayer relay are someone else's problem. */
   if (url.origin !== self.location.origin) return;
-  if (INDEPENDENT_APPS.some(path => url.pathname === path || url.pathname.startsWith(`${path}/`))) return;
+  if (isIndependentApp(url.pathname)) return;
   /* Video arrives in ranges; passing those through the cache goes wrong
      in ways that are worse than the video simply not playing offline. */
   if (request.headers.has('range') || isVideo(url.pathname)) return;
