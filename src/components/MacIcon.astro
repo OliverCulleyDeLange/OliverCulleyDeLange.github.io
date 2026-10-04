@@ -20,7 +20,11 @@ interface Props {
 }
 const { name, size, class: className = '', nested = false } = Astro.props;
 const px = size ?? 16;
-const cls = [nested ? null : 'mac-icon', className].filter(Boolean).join(' ') || undefined;
+const cls = [
+  nested ? null : 'mac-icon',
+  name === 'github' || name === 'linkedin' ? 'mac-icon-social' : null,
+  className,
+].filter(Boolean).join(' ') || undefined;
 /* A plain folder is the default; give one an icon and it rides on the face. */
 const folderGlyph = name.startsWith('folder:') ? name.slice('folder:'.length) : null;
 
@@ -281,7 +285,7 @@ const letterO: [number, number, number][] = [
   /* Octocat silhouette — solid pixel head with two knocked-out eyes
      and a splayed set of tentacle feet below. */
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
-    <g fill="currentColor">
+    <g fill="var(--social-icon-foreground, currentColor)">
       {/* Head — rounded top */}
       <rect x="4" y="1" width="8" height="1"/>
       <rect x="3" y="2" width="10" height="1"/>
@@ -299,7 +303,7 @@ const letterO: [number, number, number][] = [
       <rect x="9" y="13" width="1" height="1"/>
       <rect x="11" y="13" width="1" height="1"/>
     </g>
-    <g fill="var(--paper)">
+    <g fill="var(--social-icon-knockout, var(--paper))">
       {/* Eyes */}
       <rect x="3" y="5" width="2" height="2"/>
       <rect x="11" y="5" width="2" height="2"/>
@@ -310,8 +314,8 @@ const letterO: [number, number, number][] = [
   /* Filled square badge with a lowercase "in" carved out in paper,
      the way the real mark reads on a screen full of tiles. */
   <svg class={cls} width={px} height={px} viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
-    <rect x="0" y="0" width="16" height="16" fill="currentColor"/>
-    <g fill="var(--paper)">
+    <rect x="0" y="0" width="16" height="16" fill="var(--social-icon-foreground, currentColor)"/>
+    <g fill="var(--social-icon-knockout, var(--paper))">
       {/* i — dot then shaft */}
       <rect x="3" y="3" width="2" height="2"/>
       <rect x="3" y="7" width="2" height="6"/>

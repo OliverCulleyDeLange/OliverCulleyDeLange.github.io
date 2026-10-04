@@ -1128,6 +1128,25 @@ th,
   flex: none;
 }
 
+/* The social marks read better as light badges on the mid-grey desktop.
+   Their dark-theme treatment stays as ink with paper cut-outs. */
+.mac-icon-social {
+  --social-icon-foreground: var(--paper);
+  --social-icon-knockout: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mac-icon-social {
+    --social-icon-foreground: currentColor;
+    --social-icon-knockout: var(--paper);
+  }
+}
+
+:root[data-theme='dark'] .mac-icon-social {
+  --social-icon-foreground: currentColor;
+  --social-icon-knockout: var(--paper);
+}
+
 /* ═══ Alert / dialog boxes (404, errors) ═══ */
 .dialog {
   max-width: min(460px, 100%);
