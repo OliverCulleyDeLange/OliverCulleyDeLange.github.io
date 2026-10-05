@@ -46,6 +46,23 @@ const projectHref = (project: (typeof projects)[number]) =>
   projectAppUrl(project) ?? `/projects/${project.id}/`;
 const isExternal = (href: string) => /^https?:\/\//.test(href);
 
+/* The Projects menu mirrors the folders that ship on the desktop. Keep
+   anything not filed in one of those folders at the menu's top level. */
+const projectById = new Map(projects.map(project => [project.id, project]));
+const projectMenuGroups = [...desktopFolders]
+  .sort((a, b) => a.order - b.order)
+  .map(folder => ({
+    folder,
+    projects: folder.items
+      .map(id => projectById.get(id))
+      .filter((project): project is NonNullable<typeof project> => Boolean(project)),
+  }))
+  .filter(group => group.projects.length > 0);
+const groupedProjectIds = new Set(
+  projectMenuGroups.flatMap(group => group.projects.map(project => project.id))
+);
+const ungroupedProjects = projects.filter(project => !groupedProjectIds.has(project.id));
+
 /* Blog menu is tiered: a submenu per project that has more than one post.
    A project with a single post is listed under that post's own title. */
 const claimed = new Set<string>();
@@ -310,7 +327,30 @@ const iconNames = [...new Set([
         <li class="menu-item" tabindex="0">
           <span class="menu-label">Projects</span>
           <ul class="menu-dropdown">
-            {projects.map(project => {
+            {projectMenuGroups.map(({ folder, projects: folderProjects }) => (
+              <li class="has-submenu" tabindex="0">
+                <span class="submenu-label">{folder.name}</span>
+                <ul class="submenu">
+                  {folderProjects.map(project => {
+                    const href = projectHref(project);
+                    const ext = isExternal(href);
+                    return (
+                      <li>
+                        <a
+                          href={href}
+                          target={ext ? '_blank' : undefined}
+                          rel={ext ? 'noopener' : undefined}
+                        >{project.data.name}</a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+            {projectMenuGroups.length > 0 && ungroupedProjects.length > 0 && (
+              <li class="divider" role="separator"></li>
+            )}
+            {ungroupedProjects.map(project => {
               const href = projectHref(project);
               const ext = isExternal(href);
               return (
