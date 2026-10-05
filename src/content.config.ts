@@ -17,6 +17,7 @@ const projects = defineCollection({
   schema: z.object({
     name: z.string(),
     tagline: z.string(),
+    rating: z.number().min(0).max(5),
     appUrl: z.string().optional(),
     devAppUrl: z.string().optional(),
     appLabel: z.string().optional().default('Open app'),

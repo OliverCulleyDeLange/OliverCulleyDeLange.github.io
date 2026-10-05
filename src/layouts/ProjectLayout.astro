@@ -2,13 +2,14 @@
 import BaseLayout from './BaseLayout.astro';
 import { getCollection } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
+import ProjectRating from '../components/ProjectRating.astro';
 
 interface Props {
   project: CollectionEntry<'projects'>;
 }
 
 const { project } = Astro.props;
-const { name, tagline, appUrl, devAppUrl, appLabel, githubUrl, relatedPosts } = project.data;
+const { name, tagline, rating, appUrl, devAppUrl, appLabel, githubUrl, relatedPosts } = project.data;
 const resolvedAppUrl = import.meta.env.DEV && devAppUrl ? devAppUrl : appUrl;
 
 // Load related blog posts
@@ -21,9 +22,16 @@ linked.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
     <header class="project-header">
       <h1>{name}</h1>
       <p class="project-tagline">{tagline}</p>
+      <ProjectRating rating={rating} />
       <div class="project-links">
         {resolvedAppUrl && (
-          <a href={resolvedAppUrl} class="btn btn-primary" target="_blank" rel="noopener">{appLabel ?? 'Open app'}</a>
+          <a
+            href={resolvedAppUrl}
+            class="btn btn-primary"
+            target="_blank"
+            rel="noopener"
+            data-project-id={project.id}
+          >{appLabel ?? 'Open app'}</a>
         )}
         {githubUrl && (
           <a href={githubUrl} class="btn btn-ghost" target="_blank" rel="noopener" aria-label="View source on GitHub">

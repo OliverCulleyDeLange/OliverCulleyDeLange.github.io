@@ -710,7 +710,28 @@ h4, h5, h6 { font-size: 1rem; }
   color: var(--paper);
 }
 
-/* ═══ Home: Finder icon grid for projects ═══ */
+/* ═══ Projects overview ═══ */
+.projects-intro {
+  max-width: 680px;
+  margin-bottom: 2rem;
+}
+
+.projects-eyebrow {
+  margin-bottom: 0.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--grey);
+}
+
+.projects-intro h1 {
+  margin-bottom: 0.65rem;
+}
+
+.projects-intro > p:last-child {
+  max-width: 62ch;
+  line-height: 1.65;
+}
+
 .projects-section {
   margin-bottom: 2rem;
 }
@@ -767,6 +788,44 @@ h4, h5, h6 { font-size: 1rem; }
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--ink);
+}
+
+.project-rating {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.project-rating-stars {
+  position: relative;
+  display: inline-block;
+  color: var(--grey-light);
+  letter-spacing: 0.08em;
+}
+
+.project-rating-stars::after {
+  content: '★★★★★';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--rating-fill);
+  overflow: hidden;
+  color: var(--ink);
+}
+
+.project-rating-value {
+  color: var(--grey);
+}
+
+.project-page .project-header > .project-rating {
+  display: flex;
+  width: max-content;
+  margin-top: 0;
+  margin-bottom: 1rem;
 }
 
 .project-card-actions {

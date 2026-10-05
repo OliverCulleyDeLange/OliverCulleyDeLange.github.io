@@ -28,7 +28,7 @@ const barTitle = windowTitle ?? title ?? siteTitle;
 const isDesktopShell = Astro.url.pathname === '/';
 
 const projects = (await getCollection('projects')).sort(
-  (a, b) => (a.data.order ?? 99) - (b.data.order ?? 99)
+  (a, b) => b.data.rating - a.data.rating || a.data.order - b.data.order
 );
 
 const allPosts = await getCollection('posts');
@@ -55,7 +55,8 @@ const projectMenuGroups = [...desktopFolders]
     folder,
     projects: folder.items
       .map(id => projectById.get(id))
-      .filter((project): project is NonNullable<typeof project> => Boolean(project)),
+      .filter((project): project is NonNullable<typeof project> => Boolean(project))
+      .sort((a, b) => b.data.rating - a.data.rating || a.data.order - b.data.order),
   }))
   .filter(group => group.projects.length > 0);
 const groupedProjectIds = new Set(
@@ -267,10 +268,15 @@ const iconNames = [...new Set([
       (function () {
         try {
           var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (reduced || localStorage.getItem('odl-booted')) return;
+          if (localStorage.getItem('odl-booted')) return;
+          /* desktop.ts uses this one-load marker to open the Projects guide.
+             The persisted boot key means returning visitors keep their own
+             desktop session instead of seeing the guide again. */
+          document.documentElement.dataset.firstVisit = 'true';
+          localStorage.setItem('odl-booted', '1');
+          if (reduced) return;
           var el = document.getElementById('boot-screen');
           if (!el) return;
-          localStorage.setItem('odl-booted', '1');
           el.hidden = false;
           document.documentElement.classList.add('booting');
           var finish = function () {
@@ -327,6 +333,8 @@ const iconNames = [...new Set([
         <li class="menu-item" tabindex="0">
           <span class="menu-label">Projects</span>
           <ul class="menu-dropdown">
+            <li><a href="/projects/">Projects Overview</a></li>
+            <li class="divider" role="separator"></li>
             {projectMenuGroups.map(({ folder, projects: folderProjects }) => (
               <li class="has-submenu" tabindex="0">
                 <span class="submenu-label">{folder.name}</span>
@@ -340,6 +348,7 @@ const iconNames = [...new Set([
                           href={href}
                           target={ext ? '_blank' : undefined}
                           rel={ext ? 'noopener' : undefined}
+                          data-project-id={project.id}
                         >{project.data.name}</a>
                       </li>
                     );
@@ -359,6 +368,7 @@ const iconNames = [...new Set([
                     href={href}
                     target={ext ? '_blank' : undefined}
                     rel={ext ? 'noopener' : undefined}
+                    data-project-id={project.id}
                   >{project.data.name}</a>
                 </li>
               );

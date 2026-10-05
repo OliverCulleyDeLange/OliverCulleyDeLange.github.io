@@ -1,0 +1,13 @@
+---
+interface Props {
+  rating: number;
+}
+
+const { rating } = Astro.props;
+const label = Number.isInteger(rating) ? rating.toFixed(0) : rating.toFixed(1);
+const fill = `${Math.max(0, Math.min(100, rating * 20))}%`;
+---
+<span class="project-rating" aria-label={`${label} out of 5 stars`}>
+  <span class="project-rating-stars" style={`--rating-fill: ${fill}`} aria-hidden="true">★★★★★</span>
+  <span class="project-rating-value" aria-hidden="true">{label}/5</span>
+</span>

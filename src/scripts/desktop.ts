@@ -156,6 +156,17 @@ menuBar?.addEventListener('click', event => {
     return;
   }
 
+  /* Project menu links retain real hrefs for no-JS visitors and modified
+     clicks, but an ordinary selection should launch exactly like the matching
+     desktop icon (including the tiled app + Info pair where appropriate). */
+  const projectLink = event.target.closest('a[data-project-id]');
+  if (projectLink
+      && event.button === 0
+      && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    launchProject(projectLink.dataset.projectId);
+  }
+
   if (event.target.closest('.menu-dropdown a, .menu-dropdown button')) closeMenus();
 });
 
@@ -537,6 +548,18 @@ async function fetchPage(url) {
   return out;
 }
 
+function wireProjectLaunchers(container) {
+  container.querySelectorAll('a[data-project-id]').forEach(link => {
+    if (link.dataset.desktopLauncher === 'true') return;
+    link.dataset.desktopLauncher = 'true';
+    link.addEventListener('click', event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      launchProject(link.dataset.projectId);
+    });
+  });
+}
+
 async function openPage(url, opts = {}) {
   const id = 'page:' + url;
   const existing = wins.get(id);
@@ -554,6 +577,7 @@ async function openPage(url, opts = {}) {
   try {
     const page = await fetchPage(url);
     win.body.innerHTML = page.html;
+    wireProjectLaunchers(win.body);
     win.title = opts.title || page.title;
     win.el.querySelector('.win-title').textContent = win.title;
     win.el.setAttribute('aria-label', win.title);
@@ -700,6 +724,11 @@ function openProject(project) {
     icon: project.icon,
     rect: { x: gap * 2 + infoW, y: gap, w: appW, h: appH },
   });
+}
+
+function launchProject(id) {
+  const project = data.projects.find(item => item.id === id);
+  if (project) openProject(project);
 }
 
 function openCv(opts = {}) {
@@ -1568,7 +1597,18 @@ function isInternal(a) {
 document.addEventListener('click', e => {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const a = e.target.closest('a[href]');
-  if (!a || !isInternal(a)) return;
+  if (!a) return;
+
+  /* Primary project CTAs carry their project id. When they are shown inside
+     the desktop, launch them like their icon instead of following the raw app
+     URL. On standalone pages desktop.ts is absent, so they remain real links. */
+  if (a.dataset.projectId) {
+    e.preventDefault();
+    launchProject(a.dataset.projectId);
+    return;
+  }
+
+  if (!isInternal(a)) return;
   if (a.closest('#desk-icons')) return;
 
   const url = a.pathname;
@@ -1620,6 +1660,7 @@ function boot() {
     const titleEl = served.querySelector('.title-bar .title');
     const node = document.createElement('div');
     while (bodyEl.firstChild) node.appendChild(bodyEl.firstChild);
+    wireProjectLaunchers(node);
     openWindow({
       id: 'page:' + path,
       url: path,
@@ -1646,6 +1687,17 @@ function boot() {
   });
 
   void restoreWindowSession();
+
+  /* The cards are the most useful orientation for somebody arriving at the
+     desktop cold. BaseLayout marks only the first ever load, so returning
+     visitors resume their saved desktop without this window being imposed. */
+  if (root.dataset.firstVisit === 'true') {
+    void openPage('/projects/', {
+      title: 'Projects',
+      icon: 'folder',
+      size: { w: 760, h: 600 },
+    });
+  }
 }
 
 /* dock trash: click opens it, and it is the drop target handled above */
