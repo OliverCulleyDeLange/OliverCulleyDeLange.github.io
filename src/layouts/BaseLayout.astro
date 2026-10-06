@@ -21,6 +21,12 @@ const {
 const siteTitle = 'oliverdelange';
 const pageTitle = title ? `${title} | ${siteTitle}` : siteTitle;
 const barTitle = windowTitle ?? title ?? siteTitle;
+const buildDate = new Date();
+const siteVersion = import.meta.env.PUBLIC_SITE_VERSION ?? [
+  buildDate.getFullYear(),
+  buildDate.getMonth() + 1,
+  buildDate.getDate(),
+].join('.') + '-dev';
 
 /* The homepage is the interactive desktop. Every other route is also a
    shareable, standalone document: opening its full URL should show the
@@ -118,6 +124,7 @@ const pinnedIcons = pinnedProjects.map(project => ({
 
 /* Everything the window manager needs, as plain JSON. */
 const desktopData = {
+  siteVersion,
   projects: projects.map(project => ({
     id: project.id,
     name: project.data.name,

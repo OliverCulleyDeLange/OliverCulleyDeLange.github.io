@@ -20,6 +20,12 @@ npm run preview    # preview the build locally
 
 Pushing to `master` triggers the GitHub Actions workflow (`.github/workflows/deploy.yml`) which builds and deploys to GitHub Pages automatically.
 
+Each deployment gets a release version in the form `YYYY.M.D-N`, shown in
+the desktop's **About This Site** window. The workflow generates it from the
+UK date on which the run was created and its order among that day's runs, so
+rerunning the same workflow keeps the same version and a second release that
+day becomes `-2`. Local builds use `YYYY.M.D-dev`.
+
 ## Offline
 
 The site is a PWA: one visit caches every page, script, stylesheet and font,

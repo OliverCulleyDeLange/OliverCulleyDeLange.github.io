@@ -1879,10 +1879,12 @@ function openAbout(opts = {}) {
     <h2>oliverdelange.co.uk</h2>
     <p class="about-tagline">A blog, project showcase and mini web-OS.</p>
     <dl class="about-spec">
+      <dt>Version</dt><dd class="about-version"></dd>
       <dt>Built with</dt><dd>Various AI models</dd>
       <dt>Inspired by</dt><dd>Posthog, Mac OS, Linux</dd>
     </dl>
   `;
+  node.querySelector('.about-version').textContent = data.siteVersion;
   openWindow({
     id: 'about', title: 'About This Site', kind: 'folder',
     icon: 'monogram', node, size: { w: 460, h: 380 }, rect: opts.rect,
