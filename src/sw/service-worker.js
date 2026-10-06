@@ -16,12 +16,14 @@
             and never includes video — see the build script.
 
    Anything not on either list (a big map scan, a demo video) still works
-   the normal way online, and is kept once seen. */
+   the normal way online, and is kept once seen. Independently deployed apps
+   beneath this origin are passed through untouched. */
 
 const VERSION = '__VERSION__';
-const CACHE = `odl-${VERSION}`;
+const CACHE = `odl-site-${VERSION}`;
 const SHELL = __SHELL__;
 const MEDIA = __MEDIA__;
+const INDEPENDENT_APPS = __INDEPENDENT_APPS__;
 
 /* Large enough to matter, small enough not to hold up a page. */
 const MEDIA_CONCURRENCY = 4;
@@ -33,14 +35,21 @@ const OFFLINE_FALLBACK = '/';
 const CACHE_MEDIA = 'odl-cache-media';
 const CHECK_PAGE = 'odl-check-page';
 const PAGE_UPDATE_READY = 'odl-page-update-ready';
-
-/* Apps deployed independently under this origin own their own release and
-   caching lifecycle. Intercepting them here can leave cached HTML pointing at
-   content-hashed assets that their next deployment has removed. */
-const INDEPENDENT_APPS = ['/tiles'];
+const SKIP_WAITING = 'odl-skip-waiting';
+/* This marker makes the first deployment of the prompt lifecycle update
+   automatically, even when the currently cached page has no prompt code yet.
+   Later workers wait for the visitor to press Update. */
+const UPDATE_PROMPT_MARKER = 'odl-update-prompt-v1';
 
 function isIndependentApp(pathname) {
   return INDEPENDENT_APPS.some(path => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+/* Current caches use odl-site-<fingerprint>. The shorter form recognises only
+   this worker's previous 12-hex format, so the migration cannot erase a cache
+   belonging to another app just because its name happens to start with odl-. */
+function isSiteCache(name) {
+  return /^odl-(?:site-)?[a-f0-9]{12}$/.test(name);
 }
 
 /* One pass at a time, however many tabs ask for one. */
@@ -53,26 +62,36 @@ self.addEventListener('install', (event) => {
       /* One missing file shouldn't leave the visitor with no worker at
          all: fall back to caching whatever does resolve. */
       .catch(() => caches.open(CACHE).then((cache) => cacheEach(cache, SHELL)))
-      .then(() => self.skipWaiting())
+      .then(async () => {
+        const names = await caches.keys();
+        if (!names.includes(UPDATE_PROMPT_MARKER)) await self.skipWaiting();
+      })
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();
-    await Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name)));
+    const oldSiteCaches = names.filter(name => isSiteCache(name) && name !== CACHE);
+    await Promise.all(oldSiteCaches.map(name => caches.delete(name)));
+    await caches.open(UPDATE_PROMPT_MARKER);
     await self.clients.claim();
-    /* A previous worker may already have served the cached homepage for an
-       independent app route. Reload only those windows still controlled by
-       this root worker; the retry bypasses us and reaches the app itself. */
-    const windows = await self.clients.matchAll({ type: 'window' });
-    await Promise.all(windows
-      .filter(client => isIndependentApp(new URL(client.url).pathname))
-      .map(client => client.navigate(client.url)));
+    /* The first prompt-capable worker must repair clients whose cached page
+       predates the controllerchange listener. Future updates are reloaded by
+       the page only after the visitor accepts the update prompt. */
+    if (!names.includes(UPDATE_PROMPT_MARKER) && oldSiteCaches.length) {
+      const windows = await self.clients.matchAll({ type: 'window' });
+      await Promise.all(windows.map(client => client.navigate(client.url)));
+    }
   })());
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data === SKIP_WAITING) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+
   if (event.data === CACHE_MEDIA) {
     if (saveData()) return;
     if (!mediaPass) mediaPass = cacheMedia().finally(() => { mediaPass = null; });
@@ -104,20 +123,32 @@ self.addEventListener('fetch', (event) => {
     event.waitUntil(refreshPage(url, event.resultingClientId || event.clientId));
     return;
   }
-  event.respondWith(asset(request));
+  event.respondWith(assetRequest(event.clientId, request));
 });
+
+/* An independent app can reference a root-relative asset whose path does not
+   sit below the app itself. Check the requesting client as well as the asset
+   URL so those requests also bypass the portfolio cache. */
+async function assetRequest(clientId, request) {
+  const client = clientId ? await self.clients.get(clientId) : null;
+  if (client && isIndependentApp(new URL(client.url).pathname)) {
+    return fetch(request);
+  }
+  return asset(request);
+}
 
 /* A page: what we have, else the network, else the desktop, which is
    always cached and can explain itself. */
 async function page(request, url) {
-  const cached = await caches.match(documentKey(url), { ignoreSearch: true });
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(documentKey(url), { ignoreSearch: true });
   if (cached) return cached;
   try {
     const response = await fetch(request);
-    if (response.ok) (await caches.open(CACHE)).put(documentKey(url), response.clone());
+    if (response.ok) await cache.put(documentKey(url), response.clone());
     return response;
   } catch (error) {
-    return (await caches.match(OFFLINE_FALLBACK))
+    return (await cache.match(OFFLINE_FALLBACK))
       ?? new Response('Offline, and this page was never cached.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -131,7 +162,8 @@ async function page(request, url) {
    pinning separately deployed pages to an old release forever. */
 async function refreshPage(url, clientId) {
   const key = documentKey(url);
-  const cached = await caches.match(key, { ignoreSearch: true });
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(key, { ignoreSearch: true });
   let response;
   try {
     response = await fetch(new Request(url, {
@@ -145,7 +177,7 @@ async function refreshPage(url, clientId) {
   if (!response.ok || response.type !== 'basic') return;
 
   const changed = cached ? await responsesDiffer(cached, response) : false;
-  await (await caches.open(CACHE)).put(key, response.clone());
+  await cache.put(key, response.clone());
   if (!changed) return;
 
   const client = clientId ? await self.clients.get(clientId) : null;
@@ -171,11 +203,12 @@ async function responsesDiffer(cached, fresh) {
 /* Everything else: cache first, since a built asset's name changes when
    its contents do. Whatever the network gives us is kept for next time. */
 async function asset(request) {
-  const cached = await caches.match(request, { ignoreSearch: true });
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request, { ignoreSearch: true });
   if (cached) return cached;
   const response = await fetch(request);
   if (response.ok && response.type === 'basic') {
-    (await caches.open(CACHE)).put(request, response.clone());
+    await cache.put(request, response.clone());
   }
   return response;
 }

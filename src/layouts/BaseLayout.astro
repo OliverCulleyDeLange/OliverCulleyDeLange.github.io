@@ -184,6 +184,29 @@ const iconNames = [...new Set([
     <meta name="apple-mobile-web-app-title" content="oliverdelange" />
     <link rel="preload" href="/fonts/ChiKareGo2.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/styles/global.css" />
+    {import.meta.env.PROD && <script is:inline>
+      /* The build replaces this marker with the service worker's shell
+         fingerprint. Clear stale Finder state before desktop.ts can restore
+         old icon positions, folders, Trash contents or windows. Keep visual
+         and game preferences: they do not depend on the shipped icon set. */
+      (function () {
+        var version = '__ODL_PWA_VERSION__';
+        var versionKey = 'odl-pwa-version';
+        var desktopKeys = [
+          'odl-icons', 'odl-folders', 'odl-trash', 'odl-window-session', 'odl-booted'
+        ];
+        try {
+          var previous = localStorage.getItem(versionKey);
+          var hasLegacyDesktop = previous === null && desktopKeys.some(function (key) {
+            return localStorage.getItem(key) !== null;
+          });
+          if ((previous !== null && previous !== version) || hasLegacyDesktop) {
+            desktopKeys.forEach(function (key) { localStorage.removeItem(key); });
+          }
+          localStorage.setItem(versionKey, version);
+        } catch (e) {}
+      })();
+    </script>}
     <script is:inline>
       /* Older root workers may have cached the homepage as the offline
          fallback for /tiles before Tiles gained its own scoped worker. If
@@ -240,9 +263,74 @@ const iconNames = [...new Set([
         generates (src/integrations/service-worker.mjs). There is no sw.js
         in dev, so only the built site registers one. */}
     {import.meta.env.PROD && <script is:inline>
-      if ('serviceWorker' in navigator) {
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+        var hadController = Boolean(navigator.serviceWorker.controller);
+        var pendingWorker = null;
+        var refreshing = false;
+
+        function hideUpdatePrompt() {
+          var dialog = document.getElementById('update-dialog');
+          if (dialog) dialog.hidden = true;
+        }
+
+        function installUpdate() {
+          if (!pendingWorker) return;
+          var worker = pendingWorker;
+          pendingWorker = null;
+          hideUpdatePrompt();
+          worker.postMessage('odl-skip-waiting');
+        }
+
+        function offerUpdate(worker) {
+          if (!worker || pendingWorker === worker) return;
+          /* A first install has no old app to replace and needs no prompt. */
+          if (!navigator.serviceWorker.controller) {
+            worker.postMessage('odl-skip-waiting');
+            return;
+          }
+          pendingWorker = worker;
+          var dialog = document.getElementById('update-dialog');
+          if (dialog) {
+            dialog.hidden = false;
+            document.getElementById('update-ok')?.focus();
+          } else if (window.confirm('A new version is available. Update now?')) {
+            installUpdate();
+          }
+        }
+
+        function watchInstalling(worker) {
+          if (!worker) return;
+          if (worker.state === 'installed') {
+            offerUpdate(worker);
+            return;
+          }
+          worker.addEventListener('statechange', function () {
+            if (worker.state === 'installed') offerUpdate(worker);
+          });
+        }
+
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (!hadController || refreshing) return;
+          refreshing = true;
+          location.reload();
+        });
+
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js').then(function () {
+          navigator.serviceWorker.register('/sw.js').then(function (registration) {
+            document.getElementById('update-ok')?.addEventListener('click', installUpdate);
+
+            if (registration.waiting) offerUpdate(registration.waiting);
+            watchInstalling(registration.installing);
+            registration.addEventListener('updatefound', function () {
+              watchInstalling(registration.installing);
+            });
+
+            /* Registration may be throttled by the browser's normal update
+               cadence. Ask explicitly on every page load so an installed PWA
+               discovers a deployment without a manual refresh. */
+            registration.update().catch(function () {});
+
             /* Pages, scripts and fonts are already cached by now. The
                images are the heavy half, so they are asked for once this
                page has what it needs, and never on a metered connection.
@@ -256,10 +344,26 @@ const iconNames = [...new Set([
             }, 4000);
           }).catch(function () {});
         });
-      }
+      })();
     </script>}
   </head>
   <body class:list={[!isDesktopShell && 'standalone-page']}>
+    <div class="dialog update-dialog" id="update-dialog" hidden role="alertdialog"
+         aria-modal="true" aria-labelledby="update-dialog-title">
+      <div class="dialog-inner">
+        <div class="dialog-body">
+          <MacIcon name="happymac" size={36} />
+          <div class="dialog-text">
+            <p id="update-dialog-title">A new version is available.</p>
+            <p>Update now to get the latest apps and desktop.</p>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="update-ok">Update</button>
+        </div>
+      </div>
+    </div>
+
     {isDesktopShell && <div class="boot-screen" id="boot-screen" hidden>
       <MacIcon name="happymac" size={128} class="boot-mac" />
       <p class="boot-caption">Welcome to oliverdelange</p>

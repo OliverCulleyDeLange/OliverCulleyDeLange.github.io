@@ -2432,12 +2432,14 @@ html.is-locked body {
   margin: 0;
 }
 
-/* ── Folder name and reset dialogs ── */
+/* ── Update, folder name and reset dialogs ── */
+.update-dialog[hidden],
 .folder-dialog[hidden],
 .reset-dialog[hidden] {
   display: none;
 }
 
+.update-dialog,
 .folder-dialog,
 .reset-dialog {
   position: fixed;
@@ -2447,6 +2449,10 @@ html.is-locked body {
   z-index: 300;
   margin: 0;
   width: min(380px, calc(100vw - 2rem));
+}
+
+.update-dialog {
+  z-index: 10000;
 }
 
 .folder-dialog .dialog-text {

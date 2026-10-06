@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
    what the worker then does with the lists. */
 
 const TEMPLATE = new URL('../sw/service-worker.js', import.meta.url);
+const VERSION_PLACEHOLDER = '__ODL_PWA_VERSION__';
 
 /* Kept out of the precache lists entirely: the worker itself, and the
    videos, which are most of the site's bytes and stream fine online. */
@@ -46,7 +47,8 @@ function urlFor(file) {
   return '/' + file;
 }
 
-export default function serviceWorker() {
+/** @param {{ independentAppPaths?: string[] }} [options] */
+export default function serviceWorker({ independentAppPaths = [] } = {}) {
   return {
     name: 'odl-service-worker',
     hooks: {
@@ -76,9 +78,24 @@ export default function serviceWorker() {
         }
 
         const version = hash.digest('hex').slice(0, 12);
+
+        /* Put the same fingerprint in every document before the worker caches
+           it. The homepage uses this before desktop.ts starts, so a returning
+           visitor cannot restore a layout from an older set of icons. The
+           hash deliberately came from the placeholder-bearing files above:
+           this avoids making the fingerprint depend on itself. */
+        for (const file of files.filter(file => file.endsWith('.html'))) {
+          const path = join(outDir, file);
+          const html = await readFile(path, 'utf8');
+          if (html.includes(VERSION_PLACEHOLDER)) {
+            await writeFile(path, html.replaceAll(VERSION_PLACEHOLDER, version));
+          }
+        }
+
         const template = await readFile(fileURLToPath(TEMPLATE), 'utf8');
         const worker = template
           .replace('__VERSION__', version)
+          .replace('__INDEPENDENT_APPS__', JSON.stringify(independentAppPaths, null, 2))
           .replace('__SHELL__', JSON.stringify(shell, null, 2))
           .replace('__MEDIA__', JSON.stringify(media, null, 2));
         await writeFile(join(outDir, 'sw.js'), worker);

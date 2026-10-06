@@ -35,8 +35,17 @@ Videos and the handful of multi-megabyte scans are deliberately left out and
 are cached only if you actually open one.
 
 The version is a hash of the shell, so a deploy that changes nothing leaves
-the visitor's cache alone, and one that does swaps the whole cache over.
+the visitor's cache alone, and one that does swaps the whole cache over and
+resets persisted desktop layout/session state before the new desktop mounts.
+Every page load explicitly checks for a newer worker. Once it is installed and
+ready, the site prompts the visitor to update; accepting activates it and
+reloads the page under the new version.
 There is no `sw.js` in `astro dev` — only the built site registers a worker.
+
+Apps deployed independently below this domain are listed in `astro.config.mjs`.
+The root worker bypasses their documents and assets completely and only ever
+reads or deletes its own `odl-site-*` caches (plus its exact legacy fingerprint
+format during migration), leaving each app's caches untouched.
 
 Install metadata lives in `public/manifest.webmanifest`. The home-screen
 icons are rendered into the build by `src/integrations/app-icons.mjs`,
