@@ -22,6 +22,9 @@ export default defineConfig({
   site: 'https://oliverdelange.co.uk',
   integrations: [mdx(), appIcons(), serviceWorker({ independentAppPaths })],
   output: 'static',
+  // Astro 7 switched to JSX-style whitespace stripping by default, which
+  // drops the spaces between inline elements. Keep the HTML-aware behaviour.
+  compressHTML: true,
   markdown: {
     shikiConfig: {
       theme: 'github-dark',
